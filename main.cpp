@@ -11,7 +11,8 @@ int main() {
 	if (!cap.isOpened()) return -1; //check if succeeded
 
 	namedWindow("frame", WINDOW_AUTOSIZE);
-	namedWindow("control", WINDOW_AUTOSIZE);
+	namedWindow("control", WINDOW_AUTOSIZE);//trackbaride aken
+	namedWindow("frameThresh", WINDOW_AUTOSIZE);//threshold aken
 
 	int lowH = 0;
 	int highH = 179;
@@ -36,6 +37,7 @@ int main() {
 		Mat frame;//frame
 		cap >> frame;
 		if (!cap.read(frame)) break;
+
 		Mat frameHSV;//frame in HSV
 		cvtColor(frame, frameHSV, COLOR_BGR2HSV);//to HSV color space
 
@@ -44,7 +46,7 @@ int main() {
 
 		imshow("frame", frame);
 		imshow("frameThresh", frameThresh);
-		if (waitKey(30) >= 0) break;
+		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
 		
 	}
 
