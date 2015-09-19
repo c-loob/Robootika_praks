@@ -38,7 +38,7 @@ int main() {
 
 	cvCreateTrackbar("LowV", "control", &lowV, 255);//value
 	cvCreateTrackbar("HighV", "control", &highV, 255);
-
+	vector<Vec3f> circles;
 	for (;;) {
 		Mat frame;//frame
 		cap >> frame;
@@ -49,16 +49,16 @@ int main() {
 		
 		Mat frameThresh;//frame post thresh
 		inRange(frameHSV, Scalar(lowH, lowS, lowV), Scalar(highH, highS, highV), frameThresh);//threshold img in ranges
-	    
-		//medianBlur(frame, frame, 3);
-		GaussianBlur(frame, frame, Size(3, 3), 1.5, 1.5);
-		
-		split(frameHSV, hsv_channels);//channel 2 ==value(grayscale)
-		vector<Vec3f> circles;
 		Mat gray;
-		cvtColor(frame, gray, COLOR_BGR2GRAY);
+		//medianBlur(frame, frame, 3);
+		GaussianBlur(frameThresh, gray, Size(5, 5), 1.5, 1.5);
+		
+		//split(frameHSV, hsv_channels);//channel 2 ==value(grayscale)
+		
+		
+		//cvtColor(frame, gray, COLOR_BGR2GRAY);
 		if (gray.channels()==1){
-			HoughCircles(gray, circles, HOUGH_GRADIENT, 2.0, hsv_channels->rows / 4, 200, 100);
+			HoughCircles(gray, circles, HOUGH_GRADIENT, 2.0, 120, 200, 100);
 		}
 		for (size_t i = 0; i < circles.size(); i++) {
 			Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
@@ -67,9 +67,8 @@ int main() {
 			circle(frame, center, radius, Scalar(0, 0, 255), 3, 8, 0);
 			
 		}
-
 		imshow("frame", frame);
-		imshow("frameThresh", frameThresh);
+		imshow("frameThresh", gray);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
 		
 	}
