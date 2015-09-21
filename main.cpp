@@ -72,7 +72,9 @@ int main() {
 			int radius = cvRound(circles[i][2]);
 			circle(frame, center, 3, Scalar(0, 255, 0), -1, 8, 0);
 			circle(frame, center, radius, Scalar(0, 0, 255), 3, 8, 0);
-			
+			ostringstream str;
+			str << center;
+			putText(frame, str.str(), center, FONT_HERSHEY_SCRIPT_SIMPLEX, 0.5, (0, 255, 0), 2);
 		}
 
 
