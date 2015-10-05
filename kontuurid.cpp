@@ -118,6 +118,7 @@ int main() {
 		cap >> frame;
 		if (!cap.read(frame)) break;//check for error'
 
+		//preprocessing
 		pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
 		v2rav_thresh1 = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);//goal #1
 		v2rav_thresh2 = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);//goal #2
@@ -126,6 +127,10 @@ int main() {
 		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 		findContours(v2rav_thresh1, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 		findContours(v2rav_thresh2, contours_goal2, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+		//get mass centers of goals
+		mc_goal1 = process_goal(contours_goal1, frame);
+		mc_goal2 = process_goal(contours_goal2, frame);
 
 		//BALL PROCESSING
 		//get moments
@@ -149,10 +154,6 @@ int main() {
 				circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
 			}
 		}
-
-		//get mass center of goal
-		mc_goal1 = process_goal(contours_goal1, frame);
-		mc_goal2 = process_goal(contours_goal2, frame);
 
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
