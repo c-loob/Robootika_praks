@@ -32,7 +32,6 @@ Point2f process_goal(vector<vector<Point>> contours, Mat frame){
 	}
 
 	if (biggest_contour_id < 0) {
-		cout << "no goal found";
 		return NULL;//väravat ei leitud
 	}
 	else {
@@ -63,15 +62,23 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
 	namedWindow("control_ball", WINDOW_AUTOSIZE);//trackbaride aken
-	namedWindow("control_goal", WINDOW_AUTOSIZE);//trackbaride aken
+	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
+	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
 
 	//initial values for trackbars
-	int G_lowH = 72;
-	int G_highH = 110;
-	int G_lowS = 155;
-	int G_highS = 237;
-	int G_lowV = 22;
-	int G_highV = 255;
+	int G_lowH1 = 72;
+	int G_highH1 = 110;
+	int G_lowS1 = 155;
+	int G_highS1 = 237;
+	int G_lowV1 = 22;
+	int G_highV1 = 255;
+
+	int G_lowH2 = 72;
+	int G_highH2 = 110;
+	int G_lowS2 = 155;
+	int G_highS2 = 237;
+	int G_lowV2 = 22;
+	int G_highV2 = 255;
 
 	int B_lowH = 0;
 	int B_highH = 25;
@@ -88,28 +95,37 @@ int main() {
 	createTrackbar("LowV", "control_ball", &B_lowV, 255);//value
 	createTrackbar("HighV", "control_ball", &B_highV, 255);
 
-	createTrackbar("LowH", "control_goal", &G_lowH, 179);//hue
-	createTrackbar("HighH", "control_goal", &G_highH, 179);
-	createTrackbar("LowS", "control_goal", &G_lowS, 255);//saturation
-	createTrackbar("HighS", "control_goal", &G_highS, 255);
-	createTrackbar("LowV", "control_goal", &G_lowV, 255);//value
-	createTrackbar("HighV", "control_goal", &G_highV, 255);
+	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
+	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
+	createTrackbar("LowS", "control_goal1", &G_lowS1, 255);//saturation
+	createTrackbar("HighS", "control_goal1", &G_highS1, 255);
+	createTrackbar("LowV", "control_goal1", &G_lowV1, 255);//value
+	createTrackbar("HighV", "control_goal1", &G_highV1, 255);
 
-	vector< vector<Point> > contours_ball, contours_goal;
+	createTrackbar("LowH", "control_goal2", &G_lowH2, 179);//hue
+	createTrackbar("HighH", "control_goal2", &G_highH2, 179);
+	createTrackbar("LowS", "control_goal2", &G_lowS2, 255);//saturation
+	createTrackbar("HighS", "control_goal2", &G_highS2, 255);
+	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
+	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
+
+	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
 	for (;;) {
-		Mat frame, pall_thresh, v2rav_thresh;//frame
-		Point2f mc_goal;//mass center of goal
+		Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
+		Point2f mc_goal1,mc_goal2;//mass center of goal
 		cap >> frame;
 		if (!cap.read(frame)) break;//check for error'
 
 		pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
-		v2rav_thresh = preprocess(frame, G_lowH, G_lowS, G_lowV, G_highH, G_highS, G_highV);
+		v2rav_thresh1 = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);//goal #1
+		v2rav_thresh2 = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);//goal #2
 
 		//contours:
 		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-		findContours(v2rav_thresh, contours_goal, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+		findContours(v2rav_thresh1, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+		findContours(v2rav_thresh2, contours_goal2, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 		//BALL PROCESSING
 		//get moments
@@ -135,7 +151,8 @@ int main() {
 		}
 
 		//get mass center of goal
-		mc_goal = process_goal(contours_goal, frame);
+		mc_goal1 = process_goal(contours_goal1, frame);
+		mc_goal2 = process_goal(contours_goal2, frame);
 
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
