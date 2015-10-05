@@ -54,6 +54,35 @@ Point2f process_goal(vector<vector<Point>> contours, Mat frame){
 	}
 }
 
+vector<Point2f> process_ball(vector<vector<Point>> contours, Mat frame){
+	vector<Moments> mu(contours.size());
+	for (int i = 0; i < contours.size(); i++)
+	{
+		mu[i] = moments(contours[i], false);
+	}
+	//get mass centers
+	vector<Point2f> mc(contours.size());
+	if (contours.size() > 0){
+		for (int i = 0; i < contours.size(); i++)
+		{
+			mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+		}
+
+		Mat imgDrawing = Mat::zeros(frame.size(), CV_8UC3);
+
+		for (int i = 0; i < contours.size(); i++) {
+			if (contourArea(contours[i])>100) {
+				//drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
+				circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
+			}
+		}
+		return mc;
+	}
+	else{
+		return mc;
+	}
+}
+
 int main() {
 	VideoCapture cap(0);//enter cam # or video location
 	if (!cap.isOpened()) return -1; //check if succeeded
@@ -66,19 +95,19 @@ int main() {
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
 
 	//initial values for trackbars
-	int G_lowH1 = 72;
-	int G_highH1 = 110;
-	int G_lowS1 = 155;
-	int G_highS1 = 237;
-	int G_lowV1 = 22;
-	int G_highV1 = 255;
+	int G_lowH1 = 50;
+	int G_highH1 = 70;
+	int G_lowS1 = 50;
+	int G_highS1 = 150;
+	int G_lowV1 = 50;
+	int G_highV1 = 200;
 
 	int G_lowH2 = 72;
 	int G_highH2 = 110;
 	int G_lowS2 = 155;
 	int G_highS2 = 237;
-	int G_lowV2 = 22;
-	int G_highV2 = 255;
+	int G_lowV2 = 50;
+	int G_highV2 = 200;
 
 	int B_lowH = 0;
 	int B_highH = 25;
@@ -115,6 +144,7 @@ int main() {
 	for (;;) {
 		Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 		Point2f mc_goal1,mc_goal2;//mass center of goal
+		vector<Point2f> mc_ball;
 		cap >> frame;
 		if (!cap.read(frame)) break;//check for error'
 
@@ -128,32 +158,10 @@ int main() {
 		findContours(v2rav_thresh1, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 		findContours(v2rav_thresh2, contours_goal2, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-		//get mass centers of goals
+		//get mass centers of goals & balls
 		mc_goal1 = process_goal(contours_goal1, frame);
 		mc_goal2 = process_goal(contours_goal2, frame);
-
-		//BALL PROCESSING
-		//get moments
-		vector<Moments> mu(contours_ball.size());
-		for (int i = 0; i < contours_ball.size(); i++)
-		{
-			mu[i] = moments(contours_ball[i], false);
-		}
-		//get mass centers
-		vector<Point2f> mc(contours_ball.size());
-		for (int i = 0; i < contours_ball.size(); i++)
-		{
-			mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
-		}
-
-		Mat imgDrawing = Mat::zeros(frame.size(), CV_8UC3);
-
-		for (int i = 0; i < contours_ball.size(); i++) {
-			if (contourArea(contours_ball[i])>100) {
-				drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
-				circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
-			}
-		}
+		mc_ball = process_ball(contours_ball, frame);
 
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
