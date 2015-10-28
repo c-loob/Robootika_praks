@@ -1,3 +1,18 @@
+/*
+NB!
+liikumine toimub vektori abil kus: 
+	esimene element tähistab liikumist y teljel(otse)
+	teine liikumist x teljel(külgedele).
+	kolmas roteerumist(positiivne = vastupäeva või vasakule, negatiivne = päripäeva või paremale)
+
+liigutamiseks tuleb defineerida:
+	float liigu[3] = { 0, 0, 1 };
+	int max_speed = ?;
+
+ning liikumise saab esile kutsuda:
+	movement(liigu, max_speed);
+*/
+
 #include <opencv2\opencv.hpp>
 #include <opencv2\highgui.hpp>
 #include <opencv2\imgproc.hpp>
@@ -11,7 +26,45 @@
 using namespace cv;
 using namespace std;
 
+//global stuff
+vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
+vector< Vec4i > hierarchy_ball, hierarchy_goal;
+
+//sihtimise limiidid
+int vasak_limiit = 275;
+int parem_limiit = 365;
+
+//initial values for trackbars
+int G_lowH1 = 50;
+int G_highH1 = 70;
+int G_lowS1 = 50;
+int G_highS1 = 150;
+int G_lowV1 = 50;
+int G_highV1 = 200;
+
+int G_lowH2 = 72;
+int G_highH2 = 110;
+int G_lowS2 = 155;
+int G_highS2 = 237;
+int G_lowV2 = 50;
+int G_highV2 = 200;
+
+int B_lowH = 5;
+int B_highH = 25;
+int B_lowS = 80;
+int B_highS = 255;
+int B_lowV = 50;
+int B_highV = 255;
+
+//headers
 void sleepcp(int milliseconds);
+void move_robot(int * kiirus);
+void movement(float liigu[3]);
+int ymarda(float a);
+int * get_speed(float * joud);
+float * move_vector(float liigu[3]);
+int ymarda(float a);
+void stop();
 
 void sleepcp(int milliseconds) // cross-platform sleep function
 {
@@ -72,39 +125,9 @@ Point2f process_goal(vector<vector<Point>> contours, Mat frame, Scalar varv) {
 		return mc_goal[biggest_contour_id];
 	}
 }
-/*
-vector<Point2f> process_ball(vector<vector<Point>> contours, Mat frame) {
-	vector<Moments> mu(contours.size());
-	for (int i = 0; i < contours.size(); i++)
-	{
-		mu[i] = moments(contours[i], false);
-	}
-	//get mass centers
-	vector<Point2f> mc(contours.size());
-	if (contours.size() > 0) {
-		for (int i = 0; i < contours.size(); i++)
-		{
-			mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
-		}
 
-		Mat imgDrawing = Mat::zeros(frame.size(), CV_8UC3);
-
-		for (int i = 0; i < contours.size(); i++) {
-			if (contourArea(contours[i])>100) {
-				//drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
-				circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
-			}
-		}
-		return mc;
-	}
-	else {
-		return mc;
-	}
-}
-*/
-
-//väljastab ainult kõige suurema kontuuri
-Point2f process_ball(vector<vector<Point>> contours, Mat frame) {
+//väljastab ainult kõige suurema kontuuri, raadiuse
+pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 	vector<Moments> mu(contours.size());
 	for (int i = 0; i < contours.size(); i++)
 	{
@@ -124,11 +147,12 @@ Point2f process_ball(vector<vector<Point>> contours, Mat frame) {
 			if (contourArea(contours[i])>100) {
 				//drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
 				//circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
+				float radius(contours[i].size());
 			}
 		}
 		float biggest_contour_area = 0;
 		int biggest_contour_id = -1;
-		
+
 		for (int i = 0; i < contours.size(); i++) {
 			//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
 			float ctArea = contourArea(contours[i]);
@@ -137,20 +161,22 @@ Point2f process_ball(vector<vector<Point>> contours, Mat frame) {
 				biggest_contour_id = i;
 			}
 		}
-		circle(frame, mc[biggest_contour_id], 4, Scalar(255, 0, 0), -1, 8, 0);
-		return mc[biggest_contour_id];
+		float r = sqrt(biggest_contour_area / 3.1415);
+		circle(frame, mc[biggest_contour_id], r, Scalar(255, 0, 0), -1, 8, 0);
+		return make_pair(mc[biggest_contour_id], r);
 	}
 	else {
 		Point2f temp;
 		temp.x = -1;
 		temp.y = -1;
-		return temp;
+		float temp2 = 0;
+		return make_pair(temp, temp2);
 	}
 }
 
 void transmit(String port, String command){
 	try {
-		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(200));
+		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
 			my_serial.write(command + "\n");
 		}
@@ -179,56 +205,112 @@ String receive(String port, int length) {
 	}
 }
 
-void straigth(int speed, String port);
-void left(int speed, String port);
-void right(int speed, String port);
-void stop(String port);
+void stop(){
+	transmit("COM3", ("3:sd0"));//1. mootori kiirus
+	transmit("COM3", ("2:sd0"));//2. mootori kiirus
+	transmit("COM3", ("1:sd0"));//3. mootori kiirus
+}
 
-void left(int speed, String port) {//same speed, same direction
-	String cmd;
-	cmd = to_string(speed);
-	stop(port);
-	transmit(port, ("1:sd"+cmd));
-	transmit(port, ("2:sd" + cmd));
-	transmit(port, ("3:sd" + cmd));
+float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
+	//liikumise maatriks, et ei peaks iga kord arvutama
+	float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, {-0.57735, -0.33333, 0.33333}, {0, 0.66667, 0.33333} };
+	float f1, f2, f3, x, y, w;
+	static float tagastus[3];//jõudude vektor mille pärast tagastame
+
+	x = liigu[0];
+	y = liigu[1];
+	w = liigu[2];
+
+	//arvutame iga mootori jõu
+	f1 = liikumine[0][0] * x + liikumine[0][1] * y + liikumine[0][2] * w;
+	f2 = liikumine[1][0] * x + liikumine[1][1] * y + liikumine[1][2] * w;
+	f3 = liikumine[2][0] * x + liikumine[2][1] * y + liikumine[2][2] * w;
+
+	tagastus[0] = f1;
+	tagastus[1] = f2;
+	tagastus[2] = f3;
+
+	return tagastus;
+}
+
+int * get_speed(float * joud, int max_speed){
+	static int tagastus[3];
+
+	tagastus[0] = ymarda(joud[0]*max_speed);
+	tagastus[1] = ymarda(joud[1]*max_speed);
+	tagastus[2] = ymarda(joud[2]*max_speed);
+
+	return tagastus;
+}
+
+int ymarda(float a){
+	if (a > 0){
+		int b = (int)(a + 0.5);
+		return (int)b;
+	}
+	else if (a < 0){
+		int b = (int)(a - 0.5);
+		return (int)b;
+	}
+	else return 0;
+}
+
+void movement(float liigu[3], int max_speed){
+	float *jouvektor;
+	jouvektor = move_vector(liigu);
+
+	int *kiirused;
+	kiirused = get_speed(jouvektor, max_speed);
+
+	move_robot(kiirused);
+}
+
+void move_robot(int * kiirus){
+	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
+	transmit("COM3", ("3:sd" + to_string(kiirus[0])));//1. mootori kiirus
+	transmit("COM3", ("2:sd" + to_string(kiirus[1])));//2. mootori kiirus
+	transmit("COM3", ("1:sd" + to_string(kiirus[2])));//3. mootori kiirus
+
 }
 
 
 
-void stop(String port) {//all 0
-	transmit(port, ("1:sd0"));
-	transmit(port, ("2:sd0"));
-	transmit(port, ("3:sd0"));
-}
+pair<Mat, Point2f> get_frame(VideoCapture cap){
+	Mat frame, pall_thresh;
+	cap >> frame;
+	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
 
+	//jagame pildi neljaks
+	line(frame, Point(320, 0), Point(320, 480), Scalar(0, 0, 0), 2, 8, 0);
+	line(frame, Point(0, 240), Point(640, 240), Scalar(0, 0, 0), 2, 8, 0);
 
+	//joonistame "sihiku"
+	line(frame, Point(vasak_limiit, 0), Point(vasak_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
+	line(frame, Point(parem_limiit, 0), Point(parem_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
 
-void right(int speed, String port) {//same speed, same direction
-	String cmd;
-	cmd = to_string(speed);
-	stop(port);
-	transmit(port, ("1:sd-" + cmd));
-	transmit(port, ("2:sd-" + cmd));
-	transmit(port, ("3:sd-" + cmd));
-}
+	Point2f mc_ball;//mass centers
 
+	pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
 
+	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-void straigth(int speed, String port) {//NEGATIVE speed will not work!!!!!
-	String cmd;
-	cmd = to_string(speed);
-	stop(port);
-	//transmit(port, ("1:sd0\n\r" + "2:sd-" + cmd + "\n\r" + "3:sd" + cmd + "\n\r"));
+	pair<Point2f, float> result = process_ball(contours_ball, frame);
+	mc_ball = result.first;
+	float raadius = result.second;
 
-	transmit(port, ("1:sd0"));
-	transmit(port, ("2:sd-" + cmd));
-	transmit(port, ("3:sd" + cmd));
+	//arvutame palli !umbkaudse! kauguse kaamerast
+	//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
+	float palli_kaugus = 2.5 * 1060 / (2 * raadius);
+	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
+		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+
+	return make_pair(frame, mc_ball);
 }
 
 int main() {
-	VideoCapture cap(1);//enter cam # or video location
+	VideoCapture cap(0);//enter cam # or video location
 	if (!cap.isOpened()) return -1; //check if succeeded
-
+	
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
@@ -236,27 +318,7 @@ int main() {
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
 
-    //initial values for trackbars
-	int G_lowH1 = 50;
-	int G_highH1 = 70;
-	int G_lowS1 = 50;
-	int G_highS1 = 150;
-	int G_lowV1 = 50;
-	int G_highV1 = 200;
-
-	int G_lowH2 = 72;
-	int G_highH2 = 110;
-	int G_lowS2 = 155;
-	int G_highS2 = 237;
-	int G_lowV2 = 50;
-	int G_highV2 = 200;
-
-	int B_lowH = 0;
-	int B_highH = 25;
-	int B_lowS = 100;
-	int B_highS = 237;
-	int B_lowV = 22;
-	int B_highV = 255;
+	
 
 	//trackbar creation
 	createTrackbar("LowH", "control_ball", &B_lowH, 179);//hue
@@ -282,7 +344,7 @@ int main() {
 
 	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
-	
+
 	//communication const
 	String port = "COM3";
 	int baud = 19200;
@@ -299,202 +361,125 @@ int main() {
 	//start the clock
 	time(&start);
 
+	//init counter
+	int counter = 0;
+
+	//eelmise suuna meelespidaja. 1 = vasakule, 2 = paremale, 3 = otse
+	int suund = 0;
+	int speed = 50;
+
+
+	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 
 	for (;;) {
+		pair<Mat, Point2f> result = get_frame(cap);
+
+		Mat frame = result.first;
+		Point2f mc_ball = result.second;
+
 		//how much time passed
 		time(&end);
 
-		//calculate FPS
+		//calculate FPS --- hetkel ei tööta
 		++f_counter;
 		sec = difftime(end, start);
 		fps = f_counter / sec;
 		//print
-		cout << fps;
-
-		Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
-		Point2f mc_goal1, mc_goal2, mc_ball;//mass center of goal
-		//vector<Point2f> mc_ball;
-		cap >> frame;
-		if (!cap.read(frame)) break;//check for error'
-
-		Point2f temp1, temp2;
-		temp1.x = 120;
-		temp1.y = 375;
-		circle(frame, temp1, 4, Scalar(255, 255, 255), -1, 8, 0);//otsasõidu piirid
-		temp1.x = 540;
-		circle(frame, temp1, 4, Scalar(255, 255, 255), -1, 8, 0);
-
-		temp2.x = 240;
-		temp2.y = 220;
-		circle(frame, temp2, 4, Scalar(0, 0, 0), -1, 8, 0);//kauged piirid
-		temp2.x = 400;
-		circle(frame, temp2, 4, Scalar(0, 0, 0), -1, 8, 0);
+		putText(frame, to_string(fps), cvPoint(30, 30),
+			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+		
 		
 
-		//STATE0 - NO BALL
+		
+		//keera palli suunale
+		if (counter == 4){//liigutame robotit iga 4 frame möödudes.
+			counter = 0;
+			if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
+				//stop();
+				if (suund == 2){// kui viimane kord keerati paremale ja mindi pallist mööda, siis keerame vasakule, aga vaikselt
+					int i = 0;
+					while (1){
+						//get new ball position
+						pair<Mat, Point2f> result = get_frame(cap);
 
-		if (state == 0) {
-			//ball in frame? fetch or search
-			pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
-			findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-			mc_ball = process_ball(contours_ball, frame);
+						if (i == 5){
+							stop();
+							i = 0;
+						}
 
-			if ((mc_ball.x == -1) && (mc_ball.y == -1) && (otse ==true ))  {//no ball in frame
-				//search
-				sleepcp(2000);
-				otse = false;
-				right(5, port);
-				//sleepcp(25);//sleep 25ms
-				//stop(port);
-				cout << "search";
+						frame = result.first;
+						mc_ball = result.second;
+
+						float liigu[3] = { 0, 0, 0.2 };
+						movement(liigu, speed);
+						cout << "vaikselt vasak" << endl;
+						imshow("orig2", frame);
+						if (waitKey(30) >= 0) break;
+
+						if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
+							cout << "stop1" << endl;
+							stop();
+							break;//kui otsesuunas, siis breagime
+						}
+						i++;
+					}
+				}
+				else {//muidu keerame rohkem vasakule(1)
+					float liigu[3] = { 0, 0, 0.3 };
+					movement(liigu, speed);
+					cout << "kärmelt vasak" << endl;
+				}
+
+				suund = 1;
 			}
-			else {// ball in frame; INCREASE STATE if catch ball!
-				float x, y; //suurima palli x ja y koordinaadid
-				x = mc_ball.x;
-				y = mc_ball.y;
-				if (y<temp1.y){//ei ole veel "käeulatuses"
-					//liigu mc_ball_biggest peale
-					if (x == 0) {//palli pole näha
-						cout << "errrrror" << endl;
-					}
-					else if (x > 400) {//vaja paremale pöörata
-						right(10, port);
-						//sleepcp(25);
-						//stop(port);
-						cout << "paremale" << endl;
-					}
-					else if (x < 240) {//vaja vasakule pöörata
-						left(10, port);
-						//sleepcp(25);
-						//stop(port);
-						cout << "vasakule" << endl;
-					}
-					//else straigth
-					else {
-						straigth(30, port);
-						//sleepcp(25);
-						//stop(port);
-						otse = true;
-						cout << "otse" << endl;
+			else if (mc_ball.x > parem_limiit){
+				//stop();
+				if (suund == 1){// kui viimane kord keerati vasakule ja mindi pallist mööda, siis keerame paremale, aga poole vähem
+					int i = 0;
+					while (1){
+						pair<Mat, Point2f> result = get_frame(cap);
+
+						if (i == 5){
+							i = 0;
+							stop();
+						}
+
+						frame = result.first;
+						mc_ball = result.second;
+						float liigu[3] = { 0, 0, -0.2 };
+						movement(liigu, speed);
+						cout << "vaikselt parem" << endl;
+						imshow("orig2", frame);
+						if (waitKey(30) >= 0) break;
+						if ((mc_ball.x > vasak_limiit) && (mc_ball.x < parem_limiit)){
+							cout << "stop2" << endl;
+							stop();
+							break;
+						}
 					}
 				}
-				else {//pall on käe ulatuses, laiendame piire, sõidame otsa lihtsalt.
-					if (x > 540) {//vaja paremale pöörata
-						cout << "paremaleotsa" << endl;
-						right(10, port);
-						//sleepcp(25);
-						//stop(port);
-					}
-					else if (x < 120) {//vaja vasakule pöörata
-						left(10, port);
-						//sleepcp(25);
-						//stop(port);
-						cout << "vasakuleotsa" << endl;
-					}
-					//else straigth
-					else {
-						straigth(50, port);
-						//sleepcp(50);
-						//stop(port);
-						otse = true;
-						cout << "otseotsa" << endl;
-					}
-				}
-			}
-		}
-
-		//STATE1 - GOT BALL
-
-		else if (state == 1) {
-			//goal in frame? goal in range? search or shoot
-			v2rav_thresh1 = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
-			findContours(v2rav_thresh1, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-			mc_goal1 = process_goal(contours_goal1, frame, Scalar(255, 0, 0));//blue
-
-			if ((mc_goal1.x == -1) && (mc_ball.y == -1)) {//can't see goal1, search
-				right(5, port);
-				sleepcp(25);//sleep 25ms
-				stop(port);
-				cout << "search";
-			}
-			else {//DECREASE STATE after shooting
-				//if in range - shoot; else liigu
-				float x, y; //värava x ja y koordinaadid
-				x = mc_goal1.x;
-				y = mc_goal1.y;
-
-				//liigu mc_goal1_biggest peale
-
-				if (x == 0) {//väravat pole näha
-					cout << "errrrror" << endl;
-				}
-				else if (x > 400) {//vaja paremale pöörata
-					cout << "paremale" << endl;
-				}
-				else if (x < 240) {//vaja vasakule pöörata
-					cout << "vasakule" << endl;
-				}
-				//else straigth
 				else {
-					cout << "otse" << endl;
+					cout << "kärmelt parem" << endl;
+					float liigu[3] = { 0, 0, -0.3 };
+					movement(liigu, speed);
 				}
-
-			}
-		}
-
-
-		/*
-		//preprocessing
-		pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
-		v2rav_thresh1 = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);//goal #1
-		v2rav_thresh2 = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);//goal #2
-
-																								   //contours:
-		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-		findContours(v2rav_thresh1, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-		findContours(v2rav_thresh2, contours_goal2, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-		//get mass centers of goals & balls
-		mc_goal1 = process_goal(contours_goal1, frame, Scalar(255, 0, 0));//blue
-		mc_goal2 = process_goal(contours_goal2, frame, Scalar(0, 0, 255));//red goal
-		mc_ball = process_ball(contours_ball, frame);
-
-		
-		
-
-		//try to connect
-		
-		try {
-			serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(200));
-			if (my_serial.isOpen()) {
-				//cout << "Great success!";
-				//do stuff to move to ball
-				//if rotation necessary
-				String command;
-				
-				if (x == 0) {//palli pole näha
-					cout << "pole näha" << endl;
-				}
-				else if((x-320) > 20){//vaja paremale pöörata
-					cout << "paremale" << endl;
-				}
-				else if ((320 - x) > 20) {//vaja vasakule pöörata
-					cout << "vasakuöe" << endl;
-				}
-				//else straigth
-				else {
-					cout << "otse" << endl;
-				}
-				//my_serial.write(command);
+				suund = 2;
 			}
 			else {
-				cout << "no.";
+				stop();
+				cout << "otse" << endl;
+				suund = 3;
 			}
-			}
-			catch (exception &e) {
-			cerr << "unhandeled exception: " << e.what() << endl;
+			
 		}
-		*/
+		else {
+			counter += 1;
+		}
+		if (counter > 4) counter = 0;
+		
+
+		
+
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
 
