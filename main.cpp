@@ -27,34 +27,34 @@ using namespace cv;
 using namespace std;
 
 //global stuff
-vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
-vector< Vec4i > hierarchy_ball, hierarchy_goal;
+	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
+	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
-//sihtimise limiidid
-int vasak_limiit = 275;
-int parem_limiit = 365;
+	//sihtimise limiidid
+	int vasak_limiit = 275;
+	int parem_limiit = 365;
 
-//initial values for trackbars
-int G_lowH1 = 50;
-int G_highH1 = 70;
-int G_lowS1 = 50;
-int G_highS1 = 150;
-int G_lowV1 = 50;
-int G_highV1 = 200;
+	//initial values for trackbars
+	int G_lowH1 = 50;
+	int G_highH1 = 70;
+	int G_lowS1 = 50;
+	int G_highS1 = 150;
+	int G_lowV1 = 50;
+	int G_highV1 = 200;
 
-int G_lowH2 = 72;
-int G_highH2 = 110;
-int G_lowS2 = 155;
-int G_highS2 = 237;
-int G_lowV2 = 50;
-int G_highV2 = 200;
+	int G_lowH2 = 72;
+	int G_highH2 = 110;
+	int G_lowS2 = 155;
+	int G_highS2 = 237;
+	int G_lowV2 = 50;
+	int G_highV2 = 200;
 
-int B_lowH = 5;
-int B_highH = 25;
-int B_lowS = 80;
-int B_highS = 255;
-int B_lowV = 50;
-int B_highV = 255;
+	int B_lowH = 5;
+	int B_highH = 25;
+	int B_lowS = 80;
+	int B_highS = 255;
+	int B_lowV = 50;
+	int B_highV = 255;
 
 //headers
 void sleepcp(int milliseconds);
