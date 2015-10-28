@@ -166,6 +166,7 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 		return make_pair(mc[biggest_contour_id], r);
 	}
 	else {
+		//kui ühtegi palli ei leita, siis tagastatakse koordinaadid (-1, -1)
 		Point2f temp;
 		temp.x = -1;
 		temp.y = -1;
@@ -391,93 +392,96 @@ int main() {
 		
 
 		
-		//keera palli suunale
-		if (counter == 4){//liigutame robotit iga 4 frame möödudes.
-			counter = 0;
-			if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
-				//stop();
-				if (suund == 2){// kui viimane kord keerati paremale ja mindi pallist mööda, siis keerame vasakule, aga vaikselt
-					int i = 0;
-					while (1){
-						//get new ball position
-						pair<Mat, Point2f> result = get_frame(cap);
+		//keera palli suunale;; EELDAB, et pall on vaateväljas!
+		if (mc_ball.x != -1){
+			if (counter == 4){//liigutame robotit iga 4 frame möödudes. AJUTINE!
+				counter = 0;
+				if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
+					//stop();
+					if (suund == 2){// kui viimane kord keerati paremale ja mindi pallist mööda, siis keerame vasakule, aga vaikselt
+						int i = 0;
+						while (1){
+							//get new ball position
+							pair<Mat, Point2f> result = get_frame(cap);
 
-						if (i == 5){
-							stop();
-							i = 0;
-						}
+							if (i == 5){
+								stop();
+								i = 0;
+							}
 
-						frame = result.first;
-						mc_ball = result.second;
+							frame = result.first;
+							mc_ball = result.second;
 
-						float liigu[3] = { 0, 0, 0.2 };
-						movement(liigu, speed);
-						cout << "vaikselt vasak" << endl;
-						imshow("orig2", frame);
-						if (waitKey(30) >= 0) break;
+							float liigu[3] = { 0, 0, 0.2 };
+							movement(liigu, speed);
+							cout << "vaikselt vasak" << endl;
+							imshow("orig2", frame);
+							if (waitKey(30) >= 0) break;
 
-						if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
-							cout << "stop1" << endl;
-							stop();
-							break;//kui otsesuunas, siis breagime
-						}
-						i++;
-					}
-				}
-				else {//muidu keerame rohkem vasakule(1)
-					float liigu[3] = { 0, 0, 0.3 };
-					movement(liigu, speed);
-					cout << "kärmelt vasak" << endl;
-				}
-
-				suund = 1;
-			}
-			else if (mc_ball.x > parem_limiit){
-				//stop();
-				if (suund == 1){// kui viimane kord keerati vasakule ja mindi pallist mööda, siis keerame paremale, aga poole vähem
-					int i = 0;
-					while (1){
-						pair<Mat, Point2f> result = get_frame(cap);
-
-						if (i == 5){
-							i = 0;
-							stop();
-						}
-
-						frame = result.first;
-						mc_ball = result.second;
-						float liigu[3] = { 0, 0, -0.2 };
-						movement(liigu, speed);
-						cout << "vaikselt parem" << endl;
-						imshow("orig2", frame);
-						if (waitKey(30) >= 0) break;
-						if ((mc_ball.x > vasak_limiit) && (mc_ball.x < parem_limiit)){
-							cout << "stop2" << endl;
-							stop();
-							break;
+							if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
+								cout << "stop1" << endl;
+								stop();
+								break;//kui otsesuunas, siis breagime
+							}
+							i++;
 						}
 					}
+					else {//muidu keerame rohkem vasakule(1)
+						float liigu[3] = { 0.5, -0.1, 0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe vasakule ja pööre vasakule
+						movement(liigu, speed);
+						cout << "kärmelt vasak" << endl;
+					}
+
+					suund = 1;
+				}
+				else if (mc_ball.x > parem_limiit){
+					//stop();
+					if (suund == 1){// kui viimane kord keerati vasakule ja mindi pallist mööda, siis keerame paremale, aga poole vähem
+						int i = 0;
+						while (1){
+							pair<Mat, Point2f> result = get_frame(cap);
+
+							if (i == 5){
+								i = 0;
+								stop();
+							}
+
+							frame = result.first;
+							mc_ball = result.second;
+							float liigu[3] = { 0, 0, -0.2 };
+							movement(liigu, speed);
+							cout << "vaikselt parem" << endl;
+							imshow("orig2", frame);
+							if (waitKey(30) >= 0) break;
+							if ((mc_ball.x > vasak_limiit) && (mc_ball.x < parem_limiit)){
+								cout << "stop2" << endl;
+								stop();
+								break;
+							}
+						}
+					}
+					else {
+						cout << "kärmelt parem" << endl;
+						float liigu[3] = { 0.5, 0.1, -0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe paremale ja pööre paremale
+						movement(liigu, speed);
+					}
+					suund = 2;
 				}
 				else {
-					cout << "kärmelt parem" << endl;
-					float liigu[3] = { 0, 0, -0.3 };
+					stop();
+					float liigu[3] = { 1, 0, 0 };
 					movement(liigu, speed);
+					cout << "otse" << endl;
+					suund = 3;
 				}
-				suund = 2;
+
 			}
 			else {
-				stop();
-				cout << "otse" << endl;
-				suund = 3;
+				counter += 1;
 			}
-			
-		}
-		else {
-			counter += 1;
-		}
-		if (counter > 4) counter = 0;
-		
+			if (counter > 4) counter = 0;
 
+		}
 		
 
 		imshow("orig", frame);
