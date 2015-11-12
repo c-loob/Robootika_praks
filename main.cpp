@@ -65,6 +65,8 @@ int * get_speed(float * joud);
 float * move_vector(float liigu[3]);
 int ymarda(float a);
 void stop();
+String receive(String port, int length);
+void transmit(String port, String command);
 
 void sleepcp(int milliseconds) // cross-platform sleep function
 {
@@ -197,12 +199,12 @@ String receive(String port, int length) {
 			return result;
 		}
 		else {
-			return NULL;// not open
+			return "not open";// not open
 		}
 	}
 	catch (exception &e) {
 		cerr << "unhandeled exception: " << e.what() << endl;
-		return NULL;
+		return "exception";
 	}
 }
 
@@ -378,6 +380,26 @@ int main() {
 		Mat frame = result.first;
 		Point2f mc_ball = result.second;
 
+		//receive commands
+		String command;
+		command = "t";
+	
+		String port = "COM4";
+
+		//TESTING AREA
+		serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
+		if (my_serial.isOpen()){
+			size_t bytes_wrote = my_serial.write(command);
+
+			string result = my_serial.read(command.length());
+			cout << "asdad" << result << endl;
+		}
+		else{
+			cout << "errrrrrrrrrrrr" << endl;
+		}
+		//TESTING AREA
+
+
 		//how much time passed
 		time(&end);
 
@@ -414,12 +436,12 @@ int main() {
 
 							float liigu[3] = { 0, 0, 0.2 };
 							movement(liigu, speed);
-							cout << "vaikselt vasak" << endl;
+							//cout << "vaikselt vasak" << endl;
 							imshow("orig2", frame);
 							if (waitKey(30) >= 0) break;
 
 							if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
-								cout << "stop1" << endl;
+								//cout << "stop1" << endl;
 								stop();
 								break;//kui otsesuunas, siis breagime
 							}
@@ -429,7 +451,7 @@ int main() {
 					else {//muidu keerame rohkem vasakule(1)
 						float liigu[3] = { 0.5, -0.1, 0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe vasakule ja pööre vasakule
 						movement(liigu, speed);
-						cout << "kärmelt vasak" << endl;
+						//cout << "kärmelt vasak" << endl;
 					}
 
 					suund = 1;
@@ -450,18 +472,18 @@ int main() {
 							mc_ball = result.second;
 							float liigu[3] = { 0, 0, -0.2 };
 							movement(liigu, speed);
-							cout << "vaikselt parem" << endl;
+							//cout << "vaikselt parem" << endl;
 							imshow("orig2", frame);
 							if (waitKey(30) >= 0) break;
 							if ((mc_ball.x > vasak_limiit) && (mc_ball.x < parem_limiit)){
-								cout << "stop2" << endl;
+								//cout << "stop2" << endl;
 								stop();
 								break;
 							}
 						}
 					}
 					else {
-						cout << "kärmelt parem" << endl;
+						//cout << "kärmelt parem" << endl;
 						float liigu[3] = { 0.5, 0.1, -0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe paremale ja pööre paremale
 						movement(liigu, speed);
 					}
