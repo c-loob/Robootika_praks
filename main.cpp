@@ -22,6 +22,10 @@ ning liikumise saab esile kutsuda:
 #include <stdio.h>
 #include <time.h>//sleepcp - windows/posix sys-s? possible future error
 #include <serial\serial.h>
+#include <thread>
+#include <string>
+#include <iostream>
+#include <mutex>
 
 using namespace cv;
 using namespace std;
@@ -259,6 +263,10 @@ int ymarda(float a){
 }
 
 void movement(float liigu[3], int max_speed){
+	if ((liigu[0] == -1) && (liigu[1]==-1) && (liigu[2]==-1) && (max_speed == -1)){
+		cout << "stop" << endl;
+		stop();
+	}
 	float *jouvektor;
 	jouvektor = move_vector(liigu);
 
@@ -359,7 +367,7 @@ int main() {
 	//start/end times; fps; frame counter; seconds elapsed since start
 	time_t start, end;
 	double fps;
-	int f_counter;
+	
 	double sec;
 	//start the clock
 	time(&start);
@@ -370,7 +378,7 @@ int main() {
 	//eelmise suuna meelespidaja. 1 = vasakule, 2 = paremale, 3 = otse
 	int suund = 0;
 	int speed = 50;
-
+	
 
 	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 
@@ -379,7 +387,7 @@ int main() {
 
 		Mat frame = result.first;
 		Point2f mc_ball = result.second;
-
+		/*
 		//TESTING AREA
 
 		//receive commands
@@ -390,6 +398,7 @@ int main() {
 
 		
 		serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
+
 		if (my_serial.isOpen()){
 			size_t bytes_wrote = my_serial.write(command);
 
@@ -399,19 +408,21 @@ int main() {
 		else{
 			cout << "errrrrrrrrrrrr" << endl;
 		}
+		
 		//TESTING AREA
-
+		*/
 
 		//how much time passed
 		time(&end);
 
 		//calculate FPS --- hetkel ei tööta
-		++f_counter;
-		sec = difftime(end, start);
-		fps = f_counter / sec;
+		//int f_counter;
+		//++f_counter;
+		//sec = difftime(end, start);
+		//fps = f_counter / sec;
 		//print
-		putText(frame, to_string(fps), cvPoint(30, 30),
-			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+		//putText(frame, to_string(fps), cvPoint(30, 30),
+		//	FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 		
 		
 
@@ -444,6 +455,9 @@ int main() {
 
 							if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
 								//cout << "stop1" << endl;
+								float liigu[3] = { -1, -1, -1 };
+								movement(liigu, -1);
+						
 								stop();
 								break;//kui otsesuunas, siis breagime
 							}
