@@ -380,13 +380,15 @@ int main() {
 		Mat frame = result.first;
 		Point2f mc_ball = result.second;
 
+		//TESTING AREA
+
 		//receive commands
 		String command;
 		command = "t";
 	
 		String port = "COM4";
 
-		//TESTING AREA
+		
 		serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
 		if (my_serial.isOpen()){
 			size_t bytes_wrote = my_serial.write(command);
