@@ -14,6 +14,7 @@ ning liikumise saab esile kutsuda:
 */
 
 //testedit//
+//test2//
 
 #include <opencv2\opencv.hpp>
 #include <opencv2\highgui.hpp>
