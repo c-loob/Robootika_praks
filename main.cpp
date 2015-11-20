@@ -43,7 +43,7 @@ std::condition_variable cond;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
 	String* rst;
-	String* temp;
+	String temp;
 
 	//sihtimise limiidid
 	int vasak_limiit = 275;
@@ -452,6 +452,9 @@ int main() {
 	
 	for (;;) {
 		
+		temp = "tere";
+		cout << temp.compare("tere") << endl;// 0 if true!!!! 1 if false
+
 		pair<Mat, Point2f> result = get_frame(cap);
 
 		Mat frame = result.first;
