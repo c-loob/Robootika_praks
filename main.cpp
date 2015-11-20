@@ -454,6 +454,12 @@ int main() {
 		
 		temp = "tere";
 		cout << temp.compare("tere") << endl;// 0 if true!!!! 1 if false
+		String tere = "tere";
+		
+		if (temp == tere){
+			cout << "yeupppp" << endl;
+			cout << temp[3] << endl;
+		}
 
 		pair<Mat, Point2f> result = get_frame(cap);
 
