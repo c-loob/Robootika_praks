@@ -462,6 +462,10 @@ int main() {
 	int suund = 0;
 	int speed = 150;
 
+	transmit("COM3", "c");
+	sleepcp(2000);
+	transmit("COM3", "k");
+
 
 	Mat frame, frame2,  pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 	thread t3(parse);
@@ -480,22 +484,22 @@ int main() {
 				if (mc_goal.x < vasak_limiitG){//pöörame vasakule(1)
 					//cout << "vasak" << endl;
 					float liigu[3] = { 0, 0, 0.3 };
-					thread t1(movement, liigu, speed);
-					t1.detach();
+					//thread t1(movement, liigu, speed);
+					//t1.detach();
 				}
 				else if (mc_goal.x > parem_limiitG){//paremale
 					//cout << "parem" << endl;
 					float liigu[3] = { 0, 0, -0.3 };
-					thread t2(movement, liigu, speed);
-					t2.detach();
+					//thread t2(movement, liigu, speed);
+					//t2.detach();
 				}
 				else {
 					stop();
 					float liigu[3] = { 0, 0, 0 };//otse
-					thread t4(movement, liigu, speed);
-					t4.detach();
+					//thread t4(movement, liigu, speed);
+					//t4.detach();
 					//cout << "otse" << endl;
-					suund = 3;
+					
 				}
 			}
 			else{//not in sight
@@ -511,22 +515,22 @@ int main() {
 				if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
 					//cout << "vasak" << endl;
 					float liigu[3] = { 0, 0, 0.3 };
-					thread t1(movement, liigu, speed);
-					t1.detach();
+					//thread t1(movement, liigu, speed);
+					//t1.detach();
 				}
 				else if (mc_ball.x > parem_limiit){//paremale
 					//cout << "parem" << endl;
 					float liigu[3] = { 0, 0, -0.3 };
-					thread t2(movement, liigu, speed);
-					t2.detach();
+					//thread t2(movement, liigu, speed);
+					//t2.detach();
 				}
 				else {
 					stop();
 					float liigu[3] = { 0, 0, 0 };//otse
-					thread t4(movement, liigu, speed);
-					t4.detach();
+					//thread t4(movement, liigu, speed);
+					//t4.detach();
 					//cout << "otse" << endl;
-					suund = 3;
+					
 				}
 			}
 			else{//not in sight
