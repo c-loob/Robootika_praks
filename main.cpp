@@ -29,13 +29,20 @@ ning liikumise saab esile kutsuda:
 #include <string>
 #include <iostream>
 #include <mutex>
+#include <condition_variable>
+#include <future>
 
 using namespace cv;
 using namespace std;
 
 //global stuff
+std::mutex mu;
+std::mutex mu2;
+std::condition_variable cond;
 	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
+
+	String* rst;
 
 	//sihtimise limiidid
 	int vasak_limiit = 275;
@@ -66,7 +73,8 @@ using namespace std;
 //headers
 void sleepcp(int milliseconds);
 void move_robot(int * kiirus);
-void movement(float liigu[3]);
+
+void movement(float liigu[3], int max_speed);
 int ymarda(float a);
 int * get_speed(float * joud);
 float * move_vector(float liigu[3]);
@@ -74,6 +82,7 @@ int ymarda(float a);
 void stop();
 String receive(String port, int length);
 void transmit(String port, String command);
+String trrx();
 
 void sleepcp(int milliseconds) // cross-platform sleep function
 {
@@ -184,41 +193,91 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 	}
 }
 
-void transmit(String port, String command){
+
+void parse(){
+	for (;;){
+		String& rst = trrx();
+		cout << rst << endl;
+	}
+}
+
+
+String trrx(){
+	String port = "COM3";
+	String command = "bl";
 	try {
+		
 		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
+			mu.lock();
 			my_serial.write(command + "\n");
+			String result = my_serial.read(8);
+			cout << result << endl;
+			mu.unlock();
+			return result;
+			
 		}
+		else{
+			String result = "+";
+			return result;
+			
+		}
+
+		
 	}
 	catch (exception &e) {
-		cerr << "unhandeled exception: " << e.what() << endl;
+	}
+}
+
+void transmit(String port, String command){//CONSUMER
+	try {
+		//lock until port open again
+		
+		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
+		if (my_serial.isOpen()) {
+			mu.lock();
+			my_serial.write(command + "\n");
+			mu.unlock();
+		}
+		else{
+			cout << "error" << endl;
+		}
+		
+	}
+	catch (exception &e) {
+		//cerr << "unhandeled exception: " << e.what() << endl;
 
 	}
+	
 }
 
 String receive(String port, int length) {
 	try {
-		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(200));
+		String result;
+		
+		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
-			String result;
+			mu.lock();
+			
 			result = my_serial.read(length);//length - saadava str pikkus bytedes
+			mu.unlock();
 			return result;
 		}
 		else {
-			return "not open";// not open
+			result = "";
+			return result;// not open
 		}
 	}
 	catch (exception &e) {
-		cerr << "unhandeled exception: " << e.what() << endl;
-		return "exception";
+		//cerr << "unhandeled exception: " << e.what() << endl;
+		return "";
 	}
 }
 
 void stop(){
-	transmit("COM3", ("3:sd0"));//1. mootori kiirus
-	transmit("COM3", ("2:sd0"));//2. mootori kiirus
-	transmit("COM3", ("1:sd0"));//3. mootori kiirus
+	//transmit("COM3", ("3:sd0"));//1. mootori kiirus
+	//transmit("COM3", ("2:sd0"));//2. mootori kiirus
+	//transmit("COM3", ("1:sd0"));//3. mootori kiirus
 }
 
 float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
@@ -275,23 +334,44 @@ void movement(float liigu[3], int max_speed){
 
 	int *kiirused;
 	kiirused = get_speed(jouvektor, max_speed);
-
-	move_robot(kiirused);
+	//std::unique_lock<mutex> locker(mu);
+	//cond.wait(locker);
+	
+	move_robot (kiirused);
+	
+	//locker.unlock();
+	
+	
+	
 }
 
-void move_robot(int * kiirus){
+void move_robot(int * kiirus){//PRODUCER
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
 	String port = "COM3";
 	String cmd1 = "3:sd" + to_string(kiirus[0]);
 	String cmd2 = "2:sd" + to_string(kiirus[1]);
 	String cmd3 = "1:sd" + to_string(kiirus[2]);
 	
+	//unique_lock<mutex> locker(mu);
+	transmit( "COM3", cmd1);
+	transmit("COM3", cmd2);
+	transmit("COM3", cmd3);
+	//locker.unlock();
+
+
+	
+	
+
+	//locker.unlock();
+	//cond.notify_one();
+	/*
 	thread t1(transmit, port, cmd1);//1. mootori kiirus
 	thread t2(transmit, port, cmd2);//2. mootori kiirus
 	thread t3(transmit,port , cmd3);//3. mootori kiirus
 	t1.detach();
 	t2.detach();
 	t3.detach();
+	*/
 }
 
 
@@ -302,12 +382,12 @@ pair<Mat, Point2f> get_frame(VideoCapture cap){
 	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
 
 	//jagame pildi neljaks
-	line(frame, Point(320, 0), Point(320, 480), Scalar(0, 0, 0), 2, 8, 0);
-	line(frame, Point(0, 240), Point(640, 240), Scalar(0, 0, 0), 2, 8, 0);
+	//line(frame, Point(320, 0), Point(320, 480), Scalar(0, 0, 0), 2, 8, 0);
+	//line(frame, Point(0, 240), Point(640, 240), Scalar(0, 0, 0), 2, 8, 0);
 
 	//joonistame "sihiku"
-	line(frame, Point(vasak_limiit, 0), Point(vasak_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
-	line(frame, Point(parem_limiit, 0), Point(parem_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
+	//line(frame, Point(vasak_limiit, 0), Point(vasak_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
+	//line(frame, Point(parem_limiit, 0), Point(parem_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
 
 	Point2f mc_ball;//mass centers
 
@@ -334,35 +414,7 @@ int main() {
 	
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-	/*
-	namedWindow("control_ball", WINDOW_AUTOSIZE);//trackbaride aken
-	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
-	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
 
-	
-
-	//trackbar creation
-	createTrackbar("LowH", "control_ball", &B_lowH, 179);//hue
-	createTrackbar("HighH", "control_ball", &B_highH, 179);
-	createTrackbar("LowS", "control_ball", &B_lowS, 255);//saturation
-	createTrackbar("HighS", "control_ball", &B_highS, 255);
-	createTrackbar("LowV", "control_ball", &B_lowV, 255);//value
-	createTrackbar("HighV", "control_ball", &B_highV, 255);
-
-	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
-	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
-	createTrackbar("LowS", "control_goal1", &G_lowS1, 255);//saturation
-	createTrackbar("HighS", "control_goal1", &G_highS1, 255);
-	createTrackbar("LowV", "control_goal1", &G_lowV1, 255);//value
-	createTrackbar("HighV", "control_goal1", &G_highV1, 255);
-
-	createTrackbar("LowH", "control_goal2", &G_lowH2, 179);//hue
-	createTrackbar("HighH", "control_goal2", &G_highH2, 179);
-	createTrackbar("LowS", "control_goal2", &G_lowS2, 255);//saturation
-	createTrackbar("HighS", "control_goal2", &G_highS2, 255);
-	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
-	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
-	*/
 	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
@@ -391,147 +443,52 @@ int main() {
 	
 
 	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
-
+	thread t3(parse);
+	t3.detach();
+	
 	for (;;) {
+		
 		pair<Mat, Point2f> result = get_frame(cap);
 
 		Mat frame = result.first;
 		Point2f mc_ball = result.second;
-		/*
-		//TESTING AREA
-
-		//receive commands
-		String command;
-		command = "t";
+		
 	
-		String port = "COM4";
 
-		
-		serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
-
-		if (my_serial.isOpen()){
-			size_t bytes_wrote = my_serial.write(command);
-
-			string result = my_serial.read(command.length());
-			cout << "asdad" << result << endl;
-		}
-		else{
-			cout << "errrrrrrrrrrrr" << endl;
-		}
-		
-		//TESTING AREA
-		*/
-
-		//how much time passed
-		time(&end);
-
-		//calculate FPS --- hetkel ei tööta
-		//int f_counter;
-		//++f_counter;
-		//sec = difftime(end, start);
-		//fps = f_counter / sec;
-		//print
-		//putText(frame, to_string(fps), cvPoint(30, 30),
-		//	FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-		
-		
-
-		
 		//keera palli suunale;; EELDAB, et pall on vaateväljas!
 		if (mc_ball.x != -1){
-			if (counter == 4){//liigutame robotit iga 4 frame möödudes. AJUTINE!
-				counter = 0;
-				if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
-					//stop();
-					if (suund == 2){// kui viimane kord keerati paremale ja mindi pallist mööda, siis keerame vasakule, aga vaikselt
-						int i = 0;
-						while (1){
-							//get new ball position
-							pair<Mat, Point2f> result = get_frame(cap);
-
-							if (i == 5){
-								stop();
-								i = 0;
-							}
-
-							frame = result.first;
-							mc_ball = result.second;
-
-							float liigu[3] = { 0, 0, 0.2 };
-							movement(liigu, speed);
-							//cout << "vaikselt vasak" << endl;
-							imshow("orig2", frame);
-							if (waitKey(30) >= 0) break;
-
-							if ((mc_ball.x < parem_limiit) && (mc_ball.x >vasak_limiit)){
-								//cout << "stop1" << endl;
-								float liigu[3] = { -1, -1, -1 };
-								movement(liigu, -1);
-						
-								stop();
-								break;//kui otsesuunas, siis breagime
-							}
-							i++;
-						}
-					}
-					else {//muidu keerame rohkem vasakule(1)
-						float liigu[3] = { 0.5, -0.1, 0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe vasakule ja pööre vasakule
-						movement(liigu, speed);
-						//cout << "kärmelt vasak" << endl;
-					}
-
-					suund = 1;
-				}
-				else if (mc_ball.x > parem_limiit){
-					//stop();
-					if (suund == 1){// kui viimane kord keerati vasakule ja mindi pallist mööda, siis keerame paremale, aga poole vähem
-						int i = 0;
-						while (1){
-							pair<Mat, Point2f> result = get_frame(cap);
-
-							if (i == 5){
-								i = 0;
-								stop();
-							}
-
-							frame = result.first;
-							mc_ball = result.second;
-							float liigu[3] = { 0, 0, -0.2 };
-							movement(liigu, speed);
-							//cout << "vaikselt parem" << endl;
-							imshow("orig2", frame);
-							if (waitKey(30) >= 0) break;
-							if ((mc_ball.x > vasak_limiit) && (mc_ball.x < parem_limiit)){
-								//cout << "stop2" << endl;
-								stop();
-								break;
-							}
-						}
-					}
-					else {
-						//cout << "kärmelt parem" << endl;
-						float liigu[3] = { 0.5, 0.1, -0.3 };//veits otse(vaja siduda palli kaugusega), kerge strafe paremale ja pööre paremale
-						movement(liigu, speed);
-					}
-					suund = 2;
-				}
-				else {
-					stop();
-					float liigu[3] = { 1, 0, 0 };
-					movement(liigu, speed);
-					cout << "otse" << endl;
-					suund = 3;
-				}
-
+			
+			if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
+				//cout << "vasak" << endl;
+				float liigu[3] = { 0, 0, 0.3 };
+				thread t1(movement,liigu, speed);
+				t1.detach();
+			}
+			else if (mc_ball.x > parem_limiit){//paremale
+				//cout << "parem" << endl;
+				float liigu[3] = { 0, 0, -0.3 };
+				thread t1(movement,liigu, speed);
+				t1.detach();
 			}
 			else {
-				counter += 1;
+				stop();
+				float liigu[3] = {0, 0, 0 };//otse
+				thread t1(movement, liigu, speed);
+				t1.detach();
+				//cout << "otse" << endl;
+				suund = 3;
 			}
-			if (counter > 4) counter = 0;
+
+			
+
+
+			//}
+			//else {
+				//counter += 1;
+			//}
+		//if (counter > 4) counter = 0;
 
 		}
-		
-
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
 
