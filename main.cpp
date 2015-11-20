@@ -43,6 +43,7 @@ std::condition_variable cond;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
 	String* rst;
+	String* temp;
 
 	//sihtimise limiidid
 	int vasak_limiit = 275;
@@ -196,8 +197,11 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 
 void parse(){
 	for (;;){
+		
 		String& rst = trrx();
-		cout << rst << endl;
+		
+		
+		sleepcp(25);
 	}
 }
 
@@ -212,7 +216,7 @@ String trrx(){
 			mu.lock();
 			my_serial.write(command + "\n");
 			String result = my_serial.read(8);
-			cout << result << endl;
+			//cout << result << endl;
 			mu.unlock();
 			return result;
 			
@@ -439,7 +443,7 @@ int main() {
 
 	//eelmise suuna meelespidaja. 1 = vasakule, 2 = paremale, 3 = otse
 	int suund = 0;
-	int speed = 50;
+	int speed = 150;
 	
 
 	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
@@ -453,7 +457,8 @@ int main() {
 		Mat frame = result.first;
 		Point2f mc_ball = result.second;
 		
-	
+		
+		
 
 		//keera palli suunale;; EELDAB, et pall on vaateväljas!
 		if (mc_ball.x != -1){
@@ -470,6 +475,7 @@ int main() {
 				thread t1(movement,liigu, speed);
 				t1.detach();
 			}
+			
 			else {
 				stop();
 				float liigu[3] = {0, 0, 0 };//otse
