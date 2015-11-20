@@ -281,10 +281,17 @@ void movement(float liigu[3], int max_speed){
 
 void move_robot(int * kiirus){
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
-	transmit("COM3", ("3:sd" + to_string(kiirus[0])));//1. mootori kiirus
-	transmit("COM3", ("2:sd" + to_string(kiirus[1])));//2. mootori kiirus
-	transmit("COM3", ("1:sd" + to_string(kiirus[2])));//3. mootori kiirus
-
+	String port = "COM3";
+	String cmd1 = "3:sd" + to_string(kiirus[0]);
+	String cmd2 = "2:sd" + to_string(kiirus[1]);
+	String cmd3 = "1:sd" + to_string(kiirus[2]);
+	
+	thread t1(transmit, port, cmd1);//1. mootori kiirus
+	thread t2(transmit, port, cmd2);//2. mootori kiirus
+	thread t3(transmit,port , cmd3);//3. mootori kiirus
+	t1.detach();
+	t2.detach();
+	t3.detach();
 }
 
 
@@ -327,7 +334,7 @@ int main() {
 	
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-
+	/*
 	namedWindow("control_ball", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -355,7 +362,7 @@ int main() {
 	createTrackbar("HighS", "control_goal2", &G_highS2, 255);
 	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
 	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
-
+	*/
 	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
 	vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
