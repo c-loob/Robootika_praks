@@ -13,6 +13,8 @@ ning liikumise saab esile kutsuda:
 	movement(liigu, max_speed);
 */
 
+//testedit//
+
 #include <opencv2\opencv.hpp>
 #include <opencv2\highgui.hpp>
 #include <opencv2\imgproc.hpp>
