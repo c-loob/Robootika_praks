@@ -1,16 +1,14 @@
 /*
 NB!
-liikumine toimub vektori abil kus: 
-	esimene element tähistab liikumist y teljel(otse)
-	teine liikumist x teljel(külgedele).
-	kolmas roteerumist(positiivne = vastupäeva või vasakule, negatiivne = päripäeva või paremale)
-
+liikumine toimub vektori abil kus:
+esimene element tähistab liikumist y teljel(otse)
+teine liikumist x teljel(külgedele).
+kolmas roteerumist(positiivne = vastupäeva või vasakule, negatiivne = päripäeva või paremale)
 liigutamiseks tuleb defineerida:
-	float liigu[3] = { 0, 0, 1 };
-	int max_speed = ?;
-
+float liigu[3] = { 0, 0, 1 };
+int max_speed = ?;
 ning liikumise saab esile kutsuda:
-	movement(liigu, max_speed);
+movement(liigu, max_speed);
 */
 
 //testedit//
@@ -40,37 +38,40 @@ using namespace std;
 std::mutex mu;
 std::mutex mu2;
 std::condition_variable cond;
-	vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
-	vector< Vec4i > hierarchy_ball, hierarchy_goal;
+vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
+vector< Vec4i > hierarchy_ball, hierarchy_goal;
 
-	String* rst;
-	String temp;
+char bl_det[];
+char bl;
 
-	//sihtimise limiidid
-	int vasak_limiit = 275;
-	int parem_limiit = 365;
+//sihtimise limiidid
+int vasak_limiit = 275;
+int parem_limiit = 365;
 
-	//initial values for trackbars
-	int G_lowH1 = 50;
-	int G_highH1 = 70;
-	int G_lowS1 = 50;
-	int G_highS1 = 150;
-	int G_lowV1 = 50;
-	int G_highV1 = 200;
+int vasak_limiitG = 200;
+int parem_limiitG = 440;
 
-	int G_lowH2 = 72;
-	int G_highH2 = 110;
-	int G_lowS2 = 155;
-	int G_highS2 = 237;
-	int G_lowV2 = 50;
-	int G_highV2 = 200;
+//initial values for trackbars
+int G_lowH1 = 50;
+int G_highH1 = 70;
+int G_lowS1 = 50;
+int G_highS1 = 150;
+int G_lowV1 = 50;
+int G_highV1 = 200;
 
-	int B_lowH = 5;
-	int B_highH = 25;
-	int B_lowS = 80;
-	int B_highS = 255;
-	int B_lowV = 50;
-	int B_highV = 255;
+int G_lowH2 = 72;
+int G_highH2 = 110;
+int G_lowS2 = 155;
+int G_highS2 = 237;
+int G_lowV2 = 50;
+int G_highV2 = 200;
+
+int B_lowH = 5;
+int B_highH = 25;
+int B_lowS = 80;
+int B_highS = 255;
+int B_lowV = 50;
+int B_highV = 255;
 
 //headers
 void sleepcp(int milliseconds);
@@ -198,10 +199,12 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 
 void parse(){
 	for (;;){
-		
-		String& rst = trrx();
-		
-		
+
+		String temp2 = trrx();
+		if (temp2.length() == 8){//if correct
+			//cout << temp2[6] << endl;
+			bl = temp2[6];
+		}
 		sleepcp(25);
 	}
 }
@@ -211,7 +214,7 @@ String trrx(){
 	String port = "COM3";
 	String command = "bl";
 	try {
-		
+
 		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
 			mu.lock();
@@ -220,15 +223,15 @@ String trrx(){
 			//cout << result << endl;
 			mu.unlock();
 			return result;
-			
+
 		}
 		else{
 			String result = "+";
 			return result;
-			
+
 		}
 
-		
+
 	}
 	catch (exception &e) {
 	}
@@ -237,7 +240,7 @@ String trrx(){
 void transmit(String port, String command){//CONSUMER
 	try {
 		//lock until port open again
-		
+
 		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
 			mu.lock();
@@ -247,23 +250,23 @@ void transmit(String port, String command){//CONSUMER
 		else{
 			cout << "error" << endl;
 		}
-		
+
 	}
 	catch (exception &e) {
 		//cerr << "unhandeled exception: " << e.what() << endl;
 
 	}
-	
+
 }
 
 String receive(String port, int length) {
 	try {
 		String result;
-		
+
 		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 		if (my_serial.isOpen()) {
 			mu.lock();
-			
+
 			result = my_serial.read(length);//length - saadava str pikkus bytedes
 			mu.unlock();
 			return result;
@@ -287,7 +290,7 @@ void stop(){
 
 float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
 	//liikumise maatriks, et ei peaks iga kord arvutama
-	float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, {-0.57735, -0.33333, 0.33333}, {0, 0.66667, 0.33333} };
+	float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, { 0, 0.66667, 0.33333 } };
 	float f1, f2, f3, x, y, w;
 	static float tagastus[3];//jõudude vektor mille pärast tagastame
 
@@ -310,9 +313,9 @@ float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nu
 int * get_speed(float * joud, int max_speed){
 	static int tagastus[3];
 
-	tagastus[0] = ymarda(joud[0]*max_speed);
-	tagastus[1] = ymarda(joud[1]*max_speed);
-	tagastus[2] = ymarda(joud[2]*max_speed);
+	tagastus[0] = ymarda(joud[0] * max_speed);
+	tagastus[1] = ymarda(joud[1] * max_speed);
+	tagastus[2] = ymarda(joud[2] * max_speed);
 
 	return tagastus;
 }
@@ -330,7 +333,7 @@ int ymarda(float a){
 }
 
 void movement(float liigu[3], int max_speed){
-	if ((liigu[0] == -1) && (liigu[1]==-1) && (liigu[2]==-1) && (max_speed == -1)){
+	if ((liigu[0] == -1) && (liigu[1] == -1) && (liigu[2] == -1) && (max_speed == -1)){
 		cout << "stop" << endl;
 		stop();
 	}
@@ -341,13 +344,13 @@ void movement(float liigu[3], int max_speed){
 	kiirused = get_speed(jouvektor, max_speed);
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
-	
-	move_robot (kiirused);
-	
+
+	move_robot(kiirused);
+
 	//locker.unlock();
-	
-	
-	
+
+
+
 }
 
 void move_robot(int * kiirus){//PRODUCER
@@ -356,16 +359,16 @@ void move_robot(int * kiirus){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[0]);
 	String cmd2 = "2:sd" + to_string(kiirus[1]);
 	String cmd3 = "1:sd" + to_string(kiirus[2]);
-	
+
 	//unique_lock<mutex> locker(mu);
-	transmit( "COM3", cmd1);
+	transmit("COM3", cmd1);
 	transmit("COM3", cmd2);
 	transmit("COM3", cmd3);
 	//locker.unlock();
 
 
-	
-	
+
+
 
 	//locker.unlock();
 	//cond.notify_one();
@@ -379,21 +382,26 @@ void move_robot(int * kiirus){//PRODUCER
 	*/
 }
 
-
-
-tuple<Mat, Point2f, float> get_frame(VideoCapture cap){
-	Mat frame, pall_thresh;
+tuple<Mat, Point2f> get_frame_goal(VideoCapture cap){
+	Mat frame, goal_thresh;
 	cap >> frame;
 	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
 
-	//jagame pildi neljaks
-	//line(frame, Point(320, 0), Point(320, 480), Scalar(0, 0, 0), 2, 8, 0);
-	//line(frame, Point(0, 240), Point(640, 240), Scalar(0, 0, 0), 2, 8, 0);
+	goal_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
 
-	//joonistame "sihiku"
-	//line(frame, Point(vasak_limiit, 0), Point(vasak_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
-	//line(frame, Point(parem_limiit, 0), Point(parem_limiit, 480), Scalar(255, 255, 255), 2, 8, 0);
+	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
+	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+
+	return make_tuple(frame, mc_goal);
+}
+
+tuple<Mat, Point2f, Point2f, float> get_frame_ball(VideoCapture cap){
+	Mat frame, pall_thresh, goal_thresh;
+	cap >> frame;
+	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
+
+	//BALL
 	Point2f mc_ball;//mass centers
 
 	pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
@@ -410,13 +418,21 @@ tuple<Mat, Point2f, float> get_frame(VideoCapture cap){
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 
-	return make_tuple(frame, mc_ball, palli_kaugus);
+	//GOAL
+	goal_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
+
+	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+
+	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
+
 
 int main() {
 	VideoCapture cap(0);//enter cam # or video location
 	if (!cap.isOpened()) return -1; //check if succeeded
-	
+
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
@@ -434,7 +450,7 @@ int main() {
 	//start/end times; fps; frame counter; seconds elapsed since start
 	time_t start, end;
 	double fps;
-	
+
 	double sec;
 	//start the clock
 	time(&start);
@@ -445,63 +461,81 @@ int main() {
 	//eelmise suuna meelespidaja. 1 = vasakule, 2 = paremale, 3 = otse
 	int suund = 0;
 	int speed = 150;
-	
 
-	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
+
+	Mat frame, frame2,  pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 	thread t3(parse);
 	t3.detach();
-	Point2f mc_ball;
+	Point2f mc_ball, mc_goal;
 	float kaugus;
 
 	for (;;) {
 		
-		temp = "tere";
-		cout << temp.compare("tere") << endl;// 0 if true!!!! 1 if false
-		String tere = "tere";
+		tie(frame, mc_ball, mc_goal, kaugus) = get_frame_ball(cap);
 		
-		if (temp == tere){
-			cout << "yeupppp" << endl;
-			cout << temp[3] << endl;
+		if (bl == '1'){
+			cout << "tribbleris" << endl;
+			if (mc_goal.x != -1){//värav vaateväljas
+
+				if (mc_goal.x < vasak_limiitG){//pöörame vasakule(1)
+					//cout << "vasak" << endl;
+					float liigu[3] = { 0, 0, 0.3 };
+					thread t1(movement, liigu, speed);
+					t1.detach();
+				}
+				else if (mc_goal.x > parem_limiitG){//paremale
+					//cout << "parem" << endl;
+					float liigu[3] = { 0, 0, -0.3 };
+					thread t2(movement, liigu, speed);
+					t2.detach();
+				}
+				else {
+					stop();
+					float liigu[3] = { 0, 0, 0 };//otse
+					thread t4(movement, liigu, speed);
+					t4.detach();
+					//cout << "otse" << endl;
+					suund = 3;
+				}
+			}
+			else{//not in sight
+
+			}
+		}
+		else if (bl == '0'){
+			cout << "nope" << endl;
+
+			//keera palli suunale;; EELDAB, et pall on vaateväljas!
+			if (mc_ball.x != -1){
+
+				if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
+					//cout << "vasak" << endl;
+					float liigu[3] = { 0, 0, 0.3 };
+					thread t1(movement, liigu, speed);
+					t1.detach();
+				}
+				else if (mc_ball.x > parem_limiit){//paremale
+					//cout << "parem" << endl;
+					float liigu[3] = { 0, 0, -0.3 };
+					thread t2(movement, liigu, speed);
+					t2.detach();
+				}
+				else {
+					stop();
+					float liigu[3] = { 0, 0, 0 };//otse
+					thread t4(movement, liigu, speed);
+					t4.detach();
+					//cout << "otse" << endl;
+					suund = 3;
+				}
+			}
+			else{//not in sight
+
+			}
 		}
 		
-		tie(frame, mc_ball, kaugus) = get_frame(cap);
 		
-		cout << "test" << endl;
-		//keera palli suunale;; EELDAB, et pall on vaateväljas!
-		if (mc_ball.x != -1){
-			
-			if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
-				//cout << "vasak" << endl;
-				float liigu[3] = { 0, 0, 0.3 };
-				thread t1(movement,liigu, speed);
-				t1.detach();
-			}
-			else if (mc_ball.x > parem_limiit){//paremale
-				//cout << "parem" << endl;
-				float liigu[3] = { 0, 0, -0.3 };
-				thread t1(movement,liigu, speed);
-				t1.detach();
-			}
-			
-			else {
-				stop();
-				float liigu[3] = {0, 0, 0 };//otse
-				thread t1(movement, liigu, speed);
-				t1.detach();
-				//cout << "otse" << endl;
-				suund = 3;
-			}
-
-			
-
-
-			//}
-			//else {
-				//counter += 1;
-			//}
-		//if (counter > 4) counter = 0;
-
-		}
+		
 		imshow("orig", frame);
 		if (waitKey(30) >= 0) break;//nupuvajutuse peale break
 
