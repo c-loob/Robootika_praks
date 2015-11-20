@@ -466,7 +466,7 @@ int main() {
 		
 		tie(frame, mc_ball, kaugus) = get_frame(cap);
 		
-
+		cout << "test" << endl;
 		//keera palli suunale;; EELDAB, et pall on vaateväljas!
 		if (mc_ball.x != -1){
 			
