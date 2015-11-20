@@ -31,6 +31,7 @@ ning liikumise saab esile kutsuda:
 #include <mutex>
 #include <condition_variable>
 #include <future>
+#include <tuple>
 
 using namespace cv;
 using namespace std;
@@ -380,7 +381,7 @@ void move_robot(int * kiirus){//PRODUCER
 
 
 
-pair<Mat, Point2f> get_frame(VideoCapture cap){
+tuple<Mat, Point2f, float> get_frame(VideoCapture cap){
 	Mat frame, pall_thresh;
 	cap >> frame;
 	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
@@ -409,7 +410,7 @@ pair<Mat, Point2f> get_frame(VideoCapture cap){
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 
-	return make_pair(frame, mc_ball);
+	return make_tuple(frame, mc_ball, palli_kaugus);
 }
 
 int main() {
@@ -449,7 +450,9 @@ int main() {
 	Mat frame, pall_thresh, v2rav_thresh1, v2rav_thresh2;//frame
 	thread t3(parse);
 	t3.detach();
-	
+	Point2f mc_ball;
+	float kaugus;
+
 	for (;;) {
 		
 		temp = "tere";
@@ -460,13 +463,8 @@ int main() {
 			cout << "yeupppp" << endl;
 			cout << temp[3] << endl;
 		}
-
-		pair<Mat, Point2f> result = get_frame(cap);
-
-		Mat frame = result.first;
-		Point2f mc_ball = result.second;
 		
-		
+		tie(frame, mc_ball, kaugus) = get_frame(cap);
 		
 
 		//keera palli suunale;; EELDAB, et pall on vaateväljas!
