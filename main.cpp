@@ -500,7 +500,8 @@ tuple<Mat, Point2f, Point2f, float> get_frame_ball(VideoCapture cap){
 
 	//GOAL
 	goal_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
-
+	imshow("goal", goal_thresh);
+	waitKey(30);
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,
 		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
@@ -517,12 +518,8 @@ int main() {
 	int speed = 150;
 
 	//trackbar creation
-	createTrackbar("LowH", "control_ball", &B_lowH, 179);//hue
-	createTrackbar("HighH", "control_ball", &B_highH, 179);
-	createTrackbar("LowS", "control_ball", &B_lowS, 255);//saturation
-	createTrackbar("HighS", "control_ball", &B_highS, 255);
-	createTrackbar("LowV", "control_ball", &B_lowV, 255);//value
-	createTrackbar("HighV", "control_ball", &B_highV, 255);
+	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
+	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
 
 	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
 	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
