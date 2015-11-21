@@ -222,10 +222,12 @@ void tx(std::vector<String> command){
 		
 			while (true){
 				try {
-					mu.lock();
+					
 					serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 					if (my_serial.isOpen()) {
+						mu.lock();
 						for (int i = 0; i < command.size(); i++){
+							
 							String* cmd = &command[i];
 							my_serial.write(command[i] + "\n");
 							if (i == command.size() - 1){
