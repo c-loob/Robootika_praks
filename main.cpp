@@ -238,7 +238,7 @@ void tx(String command){
 			}
 		}
 		catch (exception &e) {
-			cout << "error" << endl;
+			//cout << "error" << endl;
 		}
 	//}
 
@@ -462,13 +462,13 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 }
 
 void no_ball(Point2f mc_ball, float kaugus){
-	int speed = 100;
+	int speed = 150;
 	//cout << "nope" << endl;
 	//keera palli suunale; pall on vaateväljas
 	if (mc_ball.x != -1){//1. kiirus
 		if (kaugus < 100){
 			set_dribbler();
-			speed = 50;
+			speed = 100;
 			//cout << "1" << endl;
 		}
 		else{
@@ -478,7 +478,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)//teine kiirus
 			float liigu[3] = { 0, 0, 0.3 };
 			if (suund = true){//eelmine paremale
-				movement(liigu, speed / 2);
+				movement(liigu, speed / 3);
 			}
 			else{
 			movement( liigu, speed);
@@ -490,7 +490,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 			cout << "parem" << endl;
 			float liigu[3] = { 0, 0, -0.3 };
 			if (suund = false){//eelmine vasakule
-				movement(liigu, speed / 2);
+				movement(liigu, speed / 3);
 			}
 			else{
 			movement( liigu, speed);
@@ -501,7 +501,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 			float liigu[3] = {0.5, 0, 0 };
 			if (suund == NULL){//eelmine ka otse
 				if (2 * speed > 250){
-					speed = 250;
+					speed = 200;
 				}
 				else{
 					//nothing
@@ -513,7 +513,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 			
 			//cout << "otse" << endl;
 		}
-		cout << "test" << endl;
+		
 	}
 
 	else{//SEARCH FOR BALL
@@ -618,7 +618,7 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 	String goal = "yellow";
 	for (;;) {
-		
+		/*
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
 		
 		if (bl == '1'){
@@ -628,7 +628,9 @@ int main() {
 			no_ball(mc_ball, kaugus);
 			
 		}
-		
+		*/
+		float liigu[3] = { 1, 0, 0 };
+		movement(liigu, 75);
 		imshow("orig", frame);
 		waitKey(10);
 	}
