@@ -409,10 +409,12 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 			//t2.detach();
 		}
 		else {
+			/*
 			stop();
 			charge();
 			sleepcp(2000);
 			kick();
+			*/
 		}
 	}
 	else{//SEARCH FOR GOAL
