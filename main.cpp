@@ -94,6 +94,7 @@ void kick();
 void move_robot(int * kiirus);
 void ball_in(Point2f mc_goal);
 void no_ball(Point2f mc_ball);
+void tx(String command);
 
 void sleepcp(int milliseconds) // cross-platform sleep function
 {
@@ -213,38 +214,35 @@ void parse(){//check if in dribbler
 		if (temp2.length() == 8){//if correct
 			bl = temp2[6];
 		}
+		sleepcp(25);
 	}
 }
 
-void tx(std::vector<String> command){
+void tx(String command){
 	String port = "COM3";
-	
-		
-			while (true){
-				try {
-					
-					serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
-					if (my_serial.isOpen()) {
-						mu.lock();
-						for (int i = 0; i < command.size(); i++){
-							
-							String* cmd = &command[i];
-							my_serial.write(command[i] + "\n");
-							if (i == command.size() - 1){
-								mu.unlock();
-							}
-						}
-				
-						cout << "done" << endl;
-					}
-				
-				}
-				catch (exception &e) {
-				}
-		}
-		
-	}
+	cout << "wat" << endl;
+	//while (true){
 
+		try {
+
+			serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
+			if (my_serial.isOpen()) {
+				mu.lock();
+				my_serial.write(command + "\n");
+				mu.unlock();
+				cout << "done" << endl;
+				
+			}
+			else{
+				cout << "nope" << endl;
+			}
+		}
+		catch (exception &e) {
+			cout << "error" << endl;
+		}
+	//}
+
+}
 	
 	
 
@@ -354,12 +352,12 @@ void movement(float liigu[3], int max_speed){
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
 
-	move_robot( kiirused);
-	
+	thread t1(move_robot, kiirused);
+	t1.detach();
 
 	//locker.unlock();
 }
-
+/*
 vector<String> to_vector(String cmd){
 	vector<String> vektor;
 	vektor.push_back(cmd);
@@ -381,7 +379,7 @@ vector<String> to_vector(String cmd0, String cmd1, String cmd2){
 	return vektor;
 }
 
-
+*/
 void stop(){
 	float liigu[3] = { 0, 0, 0 };
 	int speed = 0;
@@ -390,23 +388,24 @@ void stop(){
 
 void set_dribbler(){
 	if (!dribbler){
-		thread tsend(tx,to_vector("dm200"));//!!!!!!!!!!!!!!!!!!!!!!!!!dm200 peab olema
-		tsend.detach();
+		thread tsend1(tx,"dm200");//!!!!!!!!!!!!!!!!!!!!!!!!!dm200 peab olema
+		tsend1.detach();
+		cout << "start" << endl;
 		dribbler = true;
 	}
 }
 
 void stop_dribbler(){
 	if (dribbler){
-		thread tsend(tx, to_vector("dm0"));
-		tsend.detach();
+		thread tsend2(tx, "dm0");
+		tsend2.detach();
+		cout << "stop" << endl;
 		dribbler = false;
 	}
 }
 
 void charge(){
-	thread tsend (tx, to_vector("c"));
-	tsend.detach();
+	tx("c");
 }
 
 void discharge(){
@@ -416,17 +415,22 @@ void discharge(){
 }
 
 void kick(){
-	thread tsend(tx,to_vector("k"));
-	tsend.detach();
+	tx("k");
 }
 
 void move_robot(int * kiirus){//PRODUCER
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
 	String port = "COM3";
 	String cmd1 = "3:sd" + to_string(kiirus[1]);
+	thread tsend(tx, cmd1);
+	tsend.detach();
 	String cmd2 = "2:sd" + to_string(kiirus[2]);
+	thread tsend2(tx, cmd2);
+	tsend2.detach();
 	String cmd3 = "1:sd" + to_string(kiirus[0]);
-	tx(to_vector(cmd1, cmd2, cmd3));
+	thread tsend3(tx, cmd3);
+	tsend3.detach();
+	
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
@@ -464,7 +468,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 	if (mc_ball.x != -1){//1. kiirus
 		if (kaugus < 100){
 			set_dribbler();
-			speed = 75;
+			speed = 50;
 			//cout << "1" << endl;
 		}
 		else{
@@ -483,7 +487,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 			
 		}
 		else if (mc_ball.x > parem_limiit){//paremale
-			//cout << "parem" << endl;
+			cout << "parem" << endl;
 			float liigu[3] = { 0, 0, -0.3 };
 			if (suund = false){//eelmine vasakule
 				movement(liigu, speed / 2);
@@ -509,6 +513,7 @@ void no_ball(Point2f mc_ball, float kaugus){
 			
 			//cout << "otse" << endl;
 		}
+		cout << "test" << endl;
 	}
 
 	else{//SEARCH FOR BALL
@@ -581,7 +586,7 @@ int main() {
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
-	thread tsend(tx,to_vector("dm0"));
+	thread tsend(tx,"dm0");
 	dribbler = false;
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
@@ -615,7 +620,7 @@ int main() {
 	for (;;) {
 		
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
-
+		
 		if (bl == '1'){
 			ball_in(mc_goal);
 		}
@@ -623,12 +628,11 @@ int main() {
 			no_ball(mc_ball, kaugus);
 			
 		}
-
+		
 		imshow("orig", frame);
-		if (waitKey(10) == 'q') break;//nupuvajutuse peale break
-
+		waitKey(10);
 	}
-	discharge();
+
 
 	//destroyAllWindows();
 	return 0;
