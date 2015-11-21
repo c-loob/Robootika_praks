@@ -354,8 +354,8 @@ void movement(float liigu[3], int max_speed){
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
 
-	thread t1(move_robot, kiirused);
-	t1.detach();
+	move_robot( kiirused);
+	
 
 	//locker.unlock();
 }
