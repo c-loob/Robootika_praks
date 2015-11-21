@@ -83,7 +83,7 @@ float * move_vector(float liigu[3]);
 int ymarda(float a);
 void stop();
 String receive(String port, int length);
-void transmit(String port, String command);
+
 String trrx();
 void set_dribbler(int speed);
 void stop_dribbler();
@@ -216,17 +216,18 @@ void parse(){//check if in dribbler
 	}
 }
 
-void tx(String command){
+void tx(std::vector<String> command){
 	String port = "COM3";
 	
 	while (true){
-		
 		try {
-
 			serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
 			if (my_serial.isOpen()) {
 				mu.lock();
-				my_serial.write(command + "\n");
+				for (int i = 0; i < command.size(); i++){
+					String* cmd = &command[i];
+					my_serial.write(command[i] + "\n");
+				}
 				mu.unlock();
 				cout << "done" << endl;
 				break;
@@ -235,8 +236,10 @@ void tx(String command){
 		catch (exception &e) {
 		}
 	}
-	
 }
+	
+	
+
 
 String trrx(){
 	String port = "COM3";
@@ -263,28 +266,6 @@ String trrx(){
 	}
 	catch (exception &e) {
 	}
-}
-
-void transmit(String port, String command){//CONSUMER
-	try {
-		//lock until port open again
-
-		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
-		if (my_serial.isOpen()) {
-			mu.lock();
-			my_serial.write(command + "\n");
-			mu.unlock();
-		}
-		else{
-			cout << "error" << endl;
-		}
-
-	}
-	catch (exception &e) {
-		//cerr << "unhandeled exception: " << e.what() << endl;
-
-	}
-
 }
 
 String receive(String port, int length) {
@@ -361,7 +342,7 @@ void movement(float liigu[3], int max_speed){
 	jouvektor = move_vector(liigu);
 
 	int *kiirused;
-	kiirused = get_speed(jouvektor, max_speed);
+	kiirused = get_speed(jouvektor, 0);//!!!!!!!!!!!!!!!!!!!!!!
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
 
@@ -371,6 +352,28 @@ void movement(float liigu[3], int max_speed){
 	//locker.unlock();
 }
 
+vector<String> to_vector(String cmd){
+	vector<String> vektor;
+	vektor.push_back(cmd);
+	return vektor;
+}
+
+vector<String> to_vector(String cmd0, String cmd1){
+	vector<String> vektor;
+	vektor.push_back(cmd0);
+	vektor.push_back(cmd1);
+	return vektor;
+}
+
+vector<String> to_vector(String cmd0, String cmd1, String cmd2){
+	vector<String> vektor;
+	vektor.push_back(cmd0);
+	vektor.push_back(cmd1);
+	vektor.push_back(cmd2);
+	return vektor;
+}
+
+
 void stop(){
 	float liigu[3] = { 0, 0, 0 };
 	int speed = 0;
@@ -379,7 +382,8 @@ void stop(){
 
 void set_dribbler(){
 	if (!dribbler){
-		tx("dm200");
+		thread tsend(tx,to_vector("dm200"));
+		tsend.detach();
 		cout << "start" << endl;
 		dribbler = true;
 	}
@@ -387,14 +391,16 @@ void set_dribbler(){
 
 void stop_dribbler(){
 	if (dribbler){
-		tx("dm0");
+		thread tsend(tx, to_vector("dm0"));
+		tsend.detach();
 		cout << "stop" << endl;
 		dribbler = false;
 	}
 }
 
 void charge(){
-	transmit("COM3", "c");
+	thread tsend (tx, to_vector("c"));
+	tsend.detach();
 }
 
 void discharge(){
@@ -404,7 +410,8 @@ void discharge(){
 }
 
 void kick(){
-	transmit("COM3", "k");
+	thread tsend(tx,to_vector("k"));
+	tsend.detach();
 }
 
 void move_robot(int * kiirus){//PRODUCER
@@ -413,10 +420,8 @@ void move_robot(int * kiirus){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]);
 	String cmd2 = "2:sd" + to_string(kiirus[2]);
 	String cmd3 = "1:sd" + to_string(kiirus[0]);
-
-	transmit("COM3", cmd1);
-	transmit("COM3", cmd2);
-	transmit("COM3", cmd3);
+	thread tsend(tx,to_vector(cmd1, cmd2, cmd3));
+	tsend.detach();
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
@@ -565,7 +570,7 @@ int main() {
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
-	tx("dm0");
+	thread tsend(tx,to_vector("dm0"));
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -589,7 +594,7 @@ int main() {
 	thread t3(parse);
 	t3.detach();
 
-	VideoCapture cap(0);//enter cam # or video location
+	VideoCapture cap(0);//enter cam # or video location-------------------
 	if (!cap.isOpened()) return -1; //check if succeeded
 
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
