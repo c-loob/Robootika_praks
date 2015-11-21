@@ -424,8 +424,7 @@ void move_robot(int * kiirus){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]);
 	String cmd2 = "2:sd" + to_string(kiirus[2]);
 	String cmd3 = "1:sd" + to_string(kiirus[0]);
-	thread tsend(tx,to_vector(cmd1, cmd2, cmd3));
-	tsend.detach();
+	tx(to_vector(cmd1, cmd2, cmd3));
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
