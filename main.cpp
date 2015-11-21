@@ -35,11 +35,12 @@ using namespace std;
 std::mutex mu;
 std::mutex mu2;
 std::condition_variable cond;
-vector< vector<Point> > contours_ball, contours_goal1, contours_goal2;
-vector< Vec4i > hierarchy_ball, hierarchy_goal;
+vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black;
+vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black;
 
 char bl_det[];
 char bl;
+bool dribbler;
 
 //sihtimise limiidid
 int vasak_limiit = 275;
@@ -137,7 +138,8 @@ Point2f process_goal(vector<vector<Point>> contours, Mat frame, Scalar varv) {
 		vector<Moments> mu_goal(contours.size());
 		mu_goal[biggest_contour_id] = moments(contours[biggest_contour_id], false);
 
-		mc_goal[biggest_contour_id] = Point2f(mu_goal[biggest_contour_id].m10 / mu_goal
+		mc_goal[biggest_contour_id] = Point2f(mu_goal[biggest_contour_id].m10 / mu_goal
+
 			[biggest_contour_id].m00, mu_goal[biggest_contour_id].m01 / mu_goal[biggest_contour_id].m00);
 
 		circle(frame, mc_goal[biggest_contour_id], 4, Scalar(255, 0, 0), -1, 8, 0);
@@ -214,6 +216,28 @@ void parse(){//check if in dribbler
 	}
 }
 
+void tx(String command){
+	String port = "COM3";
+	
+	while (true){
+		
+		try {
+
+			serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
+			if (my_serial.isOpen()) {
+				mu.lock();
+				my_serial.write(command + "\n");
+				mu.unlock();
+				cout << "done" << endl;
+				break;
+			}
+		}
+		catch (exception &e) {
+		}
+	}
+	
+}
+
 String trrx(){
 	String port = "COM3";
 	String command = "bl";
@@ -288,7 +312,8 @@ String receive(String port, int length) {
 
 float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
 		//liikumise maatriks, et ei peaks iga kord arvutama
-		float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
+		float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
+
 			0, 0.66667, 0.33333 } };
 		float f1, f2, f3, x, y, w;
 		static float tagastus[3];//jõudude vektor mille pärast tagastame
@@ -340,7 +365,8 @@ void movement(float liigu[3], int max_speed){
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
 
-	move_robot(kiirused);
+	thread t1(move_robot, kiirused);
+	t1.detach();
 
 	//locker.unlock();
 }
@@ -351,18 +377,20 @@ void stop(){
 	movement(liigu, speed);
 }
 
-void set_dribbler(int speed){
-	if (speed > 250){
-		speed = 250;
+void set_dribbler(){
+	if (!dribbler){
+		tx("dm200");
+		cout << "start" << endl;
+		dribbler = true;
 	}
-	else if (speed < 0){
-		speed = 0;
-	}
-	transmit("COM3", "db" + to_string(speed));
 }
 
 void stop_dribbler(){
-	transmit("COM3", "db0");
+	if (dribbler){
+		tx("dm0");
+		cout << "stop" << endl;
+		dribbler = false;
+	}
 }
 
 void charge(){
@@ -382,9 +410,9 @@ void kick(){
 void move_robot(int * kiirus){//PRODUCER
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
 	String port = "COM3";
-	String cmd1 = "3:sd" + to_string(kiirus[0]);
-	String cmd2 = "2:sd" + to_string(kiirus[1]);
-	String cmd3 = "1:sd" + to_string(kiirus[2]);
+	String cmd1 = "3:sd" + to_string(kiirus[1]);
+	String cmd2 = "2:sd" + to_string(kiirus[2]);
+	String cmd3 = "1:sd" + to_string(kiirus[0]);
 
 	transmit("COM3", cmd1);
 	transmit("COM3", cmd2);
@@ -392,21 +420,22 @@ void move_robot(int * kiirus){//PRODUCER
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
-	cout << "dribbleris" << endl;
+	//cout << "dribbleris" << endl;
+	set_dribbler();
 	int speed = 100;
 	if (mc_goal.x != -1){//värav vaateväljas
 
 		if (mc_goal.x < vasak_limiitG){//pöörame vasakule(1)
 			//cout << "vasak" << endl;
 			float liigu[3] = { 0, 0, 0.3 };
-			//thread t1(movement, liigu, speed);
-			//t1.detach();
+			movement( liigu, speed);
+			
 		}
 		else if (mc_goal.x > parem_limiitG){//paremale
 			//cout << "parem" << endl;
 			float liigu[3] = { 0, 0, -0.3 };
-			//thread t2(movement, liigu, speed);
-			//t2.detach();
+			movement(liigu, speed);
+			
 		}
 		else {
 			/*
@@ -419,65 +448,59 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 	}
 	else{//SEARCH FOR GOAL
 		float liigu[3] = { 0, 0, 0.3 };
-		//thread t1(movement, liigu, speed);
-		//t1.detach();
+		movement( liigu, speed);
+		
 	}
 }
 
 void no_ball(Point2f mc_ball, float kaugus){
-	cout << "nope" << endl;
+	//cout << "nope" << endl;
 	int speed = 100;
 	//keera palli suunale; pall on vaateväljas
-	if ((mc_ball.x != -1)&& (kaugus < 100)){
+	if (mc_ball.x != -1){
+		if (kaugus < 50){
 
+			speed = 50;
+			//cout << "0" << endl;
+			//set_dribbler();
+		}
+		else if (kaugus < 100){
+			//set_dribbler();
+			speed = 100;
+			//cout << "1" << endl;
+		}
+		else{
+			stop_dribbler();
+			speed = 100;
+			//cout << "2" << endl;
+		}
 		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
-			//cout << "vasak" << endl;
+			cout << "vasak" << endl;
 			float liigu[3] = { 0, 0, 0.3 };
-			//thread t1(movement, liigu, speed);
-			//t1.detach();
+			movement( liigu, 50);
+			
 		}
 		else if (mc_ball.x > parem_limiit){//paremale
-			//cout << "parem" << endl;
+			cout << "parem" << endl;
 			float liigu[3] = { 0, 0, -0.3 };
-			//thread t2(movement, liigu, speed);
-			//t2.detach();
+			movement( liigu, 50);
+			
 		}
 		else {
-			stop();
-			float liigu[3] = { 0, 0, 0 };//otse
-			//thread t4(movement, liigu, speed);
-			//t4.detach();
+			float liigu[3] = {0.5, 0, 0 };
+			set_dribbler();
+			movement( liigu, 50);
+			
 			//cout << "otse" << endl;
+		}
+	}
 
-		}
-	}
-	else if ((mc_ball.x != -1) && (kaugus >= 100)){//pall näha ja kaugel
-		speed = 200;
-		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
-			//cout << "vasak" << endl;
-			float liigu[3] = { 0, -0.3, 0.2 };
-			//thread t1(movement, liigu, speed);
-			//t1.detach();
-		}
-		else if (mc_ball.x > parem_limiit){//paremale
-			//cout << "parem" << endl;
-			float liigu[3] = { 0, 0.3, -0.2 };
-			//thread t2(movement, liigu, speed);
-			//t2.detach();
-		}
-		else {
-			stop();
-			float liigu[3] = { 1, 0, 0 };//otse
-			//thread t4(movement, liigu, speed);
-			//t4.detach();
-			//cout << "otse" << endl;
-		}
-	}
 	else{//SEARCH FOR BALL
 		float liigu[3] = { 0, 0, 0.3 };
 		//thread t1(movement, liigu, speed);
 		//t1.detach();
 	}
+	
 }
 
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
@@ -515,11 +538,24 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-
-	Mat black_thresh = preprocess(frame, 0, 0, 0, 255, 255, 40);//HSV for black
-	imshow("black", black_thresh);
-	waitKey(30);
-
+	
+	//black lines
+	/*
+	Mat black_thresh = preprocess(frame,0, 0, 0,255, 200, 70);
+	vector<Vec2f> lines;
+	HoughLines(black_thresh, lines, 1, CV_PI / 180, 150, 0, 0);
+	for (size_t i = 0; i < lines.size(); i++){
+		float rho = lines[i][0], theta = lines[i][1];
+		Point pt1, pt2;
+		double a = cos(theta), b = sin(theta);
+		double x0 = a*rho, y0 = b*rho;
+		pt1.x = cvRound(x0 + 1000 * (-b));
+		pt1.y = cvRound(y0 + 1000 * (a));
+		pt2.x = cvRound(x0 - 1000 * (-b));
+		pt2.y = cvRound(y0 - 1000 * (a));
+		line(frame, pt1, pt2, Scalar(0, 0, 0), 3, CV_AA);
+	}
+	*/
 	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
 
@@ -529,7 +565,7 @@ int main() {
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
-
+	tx("dm0");
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -560,7 +596,7 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 	String goal = "yellow";
 	for (;;) {
-
+		stop_dribbler();
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
 
 		if (bl == '1'){
@@ -568,6 +604,7 @@ int main() {
 		}
 		else if (bl == '0'){
 			no_ball(mc_ball, kaugus);
+			
 		}
 
 		imshow("orig", frame);
