@@ -516,6 +516,29 @@ int main() {
 	float kaugus;
 	int speed = 150;
 
+	//trackbar creation
+	createTrackbar("LowH", "control_ball", &B_lowH, 179);//hue
+	createTrackbar("HighH", "control_ball", &B_highH, 179);
+	createTrackbar("LowS", "control_ball", &B_lowS, 255);//saturation
+	createTrackbar("HighS", "control_ball", &B_highS, 255);
+	createTrackbar("LowV", "control_ball", &B_lowV, 255);//value
+	createTrackbar("HighV", "control_ball", &B_highV, 255);
+
+	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
+	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
+	createTrackbar("LowS", "control_goal1", &G_lowS1, 255);//saturation
+	createTrackbar("HighS", "control_goal1", &G_highS1, 255);
+	createTrackbar("LowV", "control_goal1", &G_lowV1, 255);//value
+	createTrackbar("HighV", "control_goal1", &G_highV1, 255);
+
+	createTrackbar("LowH", "control_goal2", &G_lowH2, 179);//hue
+	createTrackbar("HighH", "control_goal2", &G_highH2, 179);
+	createTrackbar("LowS", "control_goal2", &G_lowS2, 255);//saturation
+	createTrackbar("HighS", "control_goal2", &G_highS2, 255);
+	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
+	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
+
+
 	//thread to check if ball in dribbler
 	thread t3(parse);
 	t3.detach();
