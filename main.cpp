@@ -56,12 +56,13 @@ int G_highS1 = 150;
 int G_lowV1 = 50;
 int G_highV1 = 200;
 
-int G_lowH2 = 72;
-int G_highH2 = 110;
-int G_lowS2 = 155;
-int G_highS2 = 237;
-int G_lowV2 = 50;
-int G_highV2 = 200;
+//Yellow goal
+int G_lowH2 = 15;
+int G_highH2 = 40;
+int G_lowS2 = 100;
+int G_highS2 = 2255;
+int G_lowV2 = 100;
+int G_highV2 = 255;
 
 int B_lowH = 5;
 int B_highH = 25;
@@ -331,10 +332,6 @@ int ymarda(float a){
 }
 
 void movement(float liigu[3], int max_speed){
-	if ((liigu[0] == -1) && (liigu[1] == -1) && (liigu[2] == -1) && (max_speed == -1)){
-		cout << "stop" << endl;
-		stop();
-	}
 	float *jouvektor;
 	jouvektor = move_vector(liigu);
 
@@ -349,9 +346,9 @@ void movement(float liigu[3], int max_speed){
 }
 
 void stop(){
-	transmit("COM3", "1:sd0");
-	transmit("COM3", "2:sd0");
-	transmit("COM3", "3:sd0");
+	float liigu[3] = { 0, 0, 0 };
+	int speed = 0;
+	movement(liigu, speed);
 }
 
 void set_dribbler(int speed){
@@ -413,23 +410,23 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 		}
 		else {
 			stop();
-			float liigu[3] = { 0, 0, 0 };//otse
-			//thread t4(movement, liigu, speed);
-			//t4.detach();
-			//cout << "otse" << endl;
-
+			charge();
+			sleepcp(2000);
+			kick();
 		}
 	}
-	else{//not in sight
-
+	else{//SEARCH FOR GOAL
+		float liigu[3] = { 0, 0, 0.3 };
+		//thread t1(movement, liigu, speed);
+		//t1.detach();
 	}
 }
 
-void no_ball(Point2f mc_ball){
+void no_ball(Point2f mc_ball, float kaugus){
 	cout << "nope" << endl;
 	int speed = 100;
-	//keera palli suunale;; EELDAB, et pall on vaateväljas!
-	if (mc_ball.x != -1){
+	//keera palli suunale; pall on vaateväljas
+	if ((mc_ball.x != -1)&& (kaugus < 100)){
 
 		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
 			//cout << "vasak" << endl;
@@ -452,30 +449,36 @@ void no_ball(Point2f mc_ball){
 
 		}
 	}
-	else{//not in sight
+	else if ((mc_ball.x != -1) && (kaugus >= 100)){//pall näha ja kaugel
+		speed = 200;
+		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)
+			//cout << "vasak" << endl;
+			float liigu[3] = { 0, -0.3, 0.2 };
+			//thread t1(movement, liigu, speed);
+			//t1.detach();
+		}
+		else if (mc_ball.x > parem_limiit){//paremale
+			//cout << "parem" << endl;
+			float liigu[3] = { 0, 0.3, -0.2 };
+			//thread t2(movement, liigu, speed);
+			//t2.detach();
+		}
+		else {
+			stop();
+			float liigu[3] = { 1, 0, 0 };//otse
+			//thread t4(movement, liigu, speed);
+			//t4.detach();
+			//cout << "otse" << endl;
+		}
+	}
+	else{//SEARCH FOR BALL
 		float liigu[3] = { 0, 0, 0.3 };
 		//thread t1(movement, liigu, speed);
 		//t1.detach();
 	}
 }
 
-
-tuple<Mat, Point2f> get_frame_goal(VideoCapture cap){
-	Mat frame, goal_thresh;
-	cap >> frame;
-	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
-
-	goal_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
-
-	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,
-		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-
-	return make_tuple(frame, mc_goal);
-}
-
-tuple<Mat, Point2f, Point2f, float> get_frame_ball(VideoCapture cap){
+tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	Mat frame, pall_thresh, goal_thresh;
 	cap >> frame;
 	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
@@ -485,8 +488,7 @@ tuple<Mat, Point2f, Point2f, float> get_frame_ball(VideoCapture cap){
 
 	pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
 
-	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE,
-		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	pair<Point2f, float> result = process_ball(contours_ball, frame);
 	mc_ball = result.first;
@@ -499,13 +501,22 @@ tuple<Mat, Point2f, Point2f, float> get_frame_ball(VideoCapture cap){
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 
 	//GOAL
-	goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
-	imshow("goal", goal_thresh);
-	waitKey(30);
-	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,
-		CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	if (goal == "yellow"){
+		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
+	}
+	else{
+		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
+	}
+
+	//imshow("goal", goal_thresh);
+	//waitKey(30);
+	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+
+	Mat black_thresh = preprocess(frame, 0, 0, 0, 255, 255, 40);//HSV for black
+	imshow("black", black_thresh);
+	waitKey(30);
 
 	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
@@ -520,15 +531,6 @@ int main() {
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
-	namedWindow("control_ball", WINDOW_AUTOSIZE);//trackbaride aken"control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
-
-
-	createTrackbar("LowH", "control_ball", &B_lowH, 179);//hue
-	createTrackbar("HighH", "control_ball", &B_highH, 179);
-	createTrackbar("LowS", "control_ball", &B_lowS, 255);//saturation
-	createTrackbar("HighS", "control_ball", &B_highS, 255);
-	createTrackbar("LowV", "control_ball", &B_lowV, 255);//value
-	createTrackbar("HighV", "control_ball", &B_highV, 255);
 
 	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
 	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
@@ -554,16 +556,16 @@ int main() {
 
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-
+	String goal = "yellow";
 	for (;;) {
 
-		tie(frame, mc_ball, mc_goal, kaugus) = get_frame_ball(cap);
+		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
 
 		if (bl == '1'){
 			ball_in(mc_goal);
 		}
 		else if (bl == '0'){
-			no_ball(mc_ball);
+			no_ball(mc_ball, kaugus);
 		}
 
 		imshow("orig", frame);
