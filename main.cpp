@@ -19,57 +19,18 @@ movement(liigu, max_speed);
 #include <opencv\cv.h>
 #include <stdio.h>
 #include <time.h>//sleepcp - windows/posix sys-s? possible future error
-#include <serial\serial.h>
-#include <thread>
 #include <string>
 #include <iostream>
-#include <mutex>
-#include <condition_variable>
-#include <future>
-#include <tuple>
 #include <boost\asio.hpp>
-#include <boost\asio\serial_port.hpp>
-#include <boost\system\error_code.hpp>
-#include <boost\system\system_error.hpp>
-#include <boost\bind.hpp>
 #include <boost\thread.hpp>
 
 using namespace cv;
 using namespace std;
 
-class Serial{
-	char read_msg_[512];
-	boost::asio::io_service m_io;
-	boost::asio::serial_port m_port;
-
-private:
-	void handler(const boost::system::error_code& error, size_t bytes_transferred){
-		read_msg_[bytes_transferred] = 0;
-		std::cout << bytes_transferred << " bytes: " << read_msg_ << std::endl;
-
-		read_some();
-	}
-
-	void read_some(){
-
-		m_port.async_read_some(boost::asio::buffer(read_msg_, 512),
-			boost::bind(&Serial::handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
-	}
-
-public:
-	Serial(const char *dev_name) :m_io(), m_port(m_io, dev_name){
-		read_some();
-
-		boost::thread t(boost::bind(&boost::asio::io_service::run, &m_io));
-	}
-};
 
 
 
 //global stuff
-std::mutex mu;
-std::mutex mu2;
-std::condition_variable cond;
 vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black;
 vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black;
 
@@ -253,93 +214,6 @@ void parse(){//check if in dribbler
 	}
 }
 
-void tx(String command){
-	String port = "COM3";
-	//cout << "wat" << endl;
-	//while (true){
-	//unique_lock<mutex> lk(mu2);
-	while (1){
-		try {
-			//mu.lock();
-			//lk.lock();
-			serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
-			
-			if (my_serial.isOpen()) {
-				
-				//lk.lock();
-				my_serial.write(command + "\r\n");
-				//mu.unlock();
-				cout << "done" << endl;
-				break;
-				
-			}
-			
-			else{
-				cout << "nope" << endl;
-			}
-			//lk.unlock();
-		}
-		catch (exception &e) {
-			//cout << "error" << endl;
-		}
-	}
-	//}
-		
-}
-	
-	
-
-
-String trrx(){
-	String port = "COM3";
-	String command = "bl";
-	try {
-
-		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
-		if (my_serial.isOpen()) {
-			mu.lock();
-			my_serial.write(command + "\n");
-			String result = my_serial.read(8);
-			//cout << result << endl;
-			mu.unlock();
-			return result;
-
-		}
-		else{
-			String result = "+";
-			return result;
-
-		}
-
-
-	}
-	catch (exception &e) {
-	}
-}
-
-String receive(String port, int length) {
-	try {
-		String result;
-
-		serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
-		if (my_serial.isOpen()) {
-			mu.lock();
-
-			result = my_serial.read(length);//length - saadava str pikkus bytedes
-			mu.unlock();
-			return result;
-		}
-		else {
-			result = "";
-			return result;// not open
-		}
-	}
-	catch (exception &e) {
-		//cerr << "unhandeled exception: " << e.what() << endl;
-		return "";
-	}
-}
-
 float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
 		//liikumise maatriks, et ei peaks iga kord arvutama
 		float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
@@ -392,37 +266,11 @@ void movement(float liigu[3], int max_speed){
 
 	int *kiirused;
 	kiirused = get_speed(jouvektor, max_speed);//!!!!!!!!!!!!!!!!!!!!!!
-	//std::unique_lock<mutex> locker(mu);
-	//cond.wait(locker);
 
 	move_robot( kiirused);
-	
 
-	//locker.unlock();
-}
-/*
-vector<String> to_vector(String cmd){
-	vector<String> vektor;
-	vektor.push_back(cmd);
-	return vektor;
 }
 
-vector<String> to_vector(String cmd0, String cmd1){
-	vector<String> vektor;
-	vektor.push_back(cmd0);
-	vektor.push_back(cmd1);
-	return vektor;
-}
-
-vector<String> to_vector(String cmd0, String cmd1, String cmd2){
-	vector<String> vektor;
-	vektor.push_back(cmd0);
-	vektor.push_back(cmd1);
-	vektor.push_back(cmd2);
-	return vektor;
-}
-
-*/
 void stop(){
 	float liigu[3] = { 0, 0, 0 };
 	int speed = 0;
@@ -467,20 +315,7 @@ void move_robot(int * kiirus){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
 	thread test(tx,cmd1);
 	test.join();
-	//thread test(tx, cmd1);
-	//test.detach();
-	//sleepcp(100);
 	
-	//tsend.detach();
-	//String cmd2 = "2:sd" + to_string(kiirus[2])+"\r\n";
-	//tx(cmd2);
-	//thread tsend2(tx, cmd2);
-	//tsend2.detach();
-	//String cmd3 = "1:sd" + to_string(kiirus[0])+"\r\n";
-	///tx(cmd3);
-	//thread tsend3(tx, cmd3);
-	//tsend3.detach();
-	//stop();
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
@@ -519,38 +354,9 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 		float liigu[3] = { 0, 0.2, 0.3 };
 		movement(liigu, 35);
 	}
-	/*set_dribbler();
-	int speed = 75;
-	if (mc_goal.x != -1){//värav vaateväljas
-		if (mc_goal.x < vasak_limiitG){//pöörame vasakule(1)
-			float liigu[3] = { 0, 0, 0.3 };
-			movement( liigu, speed);
-		}
-		else if (mc_goal.x > parem_limiitG){//paremale
-			//cout << "parem" << endl;
-			float liigu[3] = { 0, 0, -0.3 };
-			movement(liigu, speed);
-			
-		}
-		else {
-			stop();
-			//charge();
-			sleepcp(2000);
-			kick();
-		}
-	}
-	else{//SEARCH FOR GOAL
-		float liigu[3] = { 0, 0, 0.3 };
-		movement( liigu, speed);
-		
-	}*/
 }
 
 void no_ball(Point2f mc_ball, float kaugus){
-	
-	//int speed = 150;
-	
-	//cout << "nope" << endl;
 	//keera palli suunale; pall on vaateväljas
 	if (mc_ball.x != -1){//1. kiirus
 
@@ -586,67 +392,8 @@ void no_ball(Point2f mc_ball, float kaugus){
 		float liigu[3] = { 0, 0.2, 0.3 }; 
 		movement(liigu, 35);
 	}
-		//sleepcp(100);
-		//stop();
-		/*
-		if (kaugus < 150){
-		set_dribbler();
-		speed = 100;
-		//cout << "1" << endl;
-		}
-		else{
-		stop_dribbler();
-		speed = 150;
-		}
-		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)//teine kiirus
-		float liigu[3] = { 0, 0, 0.2 };
-		if (suund = true){//eelmine paremale
-		movement(liigu, speed / 4);
-		}
-		else{
-		movement( liigu, speed);
-		}
-		suund = false;
-
-		}
-		else if (mc_ball.x > parem_limiit){//paremale
-		cout << "parem" << endl;
-		float liigu[3] = { 0, 0, -0.2 };
-		if (suund = false){//eelmine vasakule
-		movement(liigu, speed / 4);
-		}
-		else{
-		movement( liigu, speed);
-		}
-		suund = true;
-		}
-		else {
-		float liigu[3] = {0.5, 0, 0 };
-		if (suund == NULL){//eelmine ka otse
-		if (2 * speed > 250){
-		speed = 200;
-		}
-		else{
-		//nothing
-		}
-		movement(liigu, speed);
-		}
-		movement( liigu, 50);
-		suund = NULL;
-
-		//cout << "otse" << endl;
-		}
-
-		}
-
-		else{//SEARCH FOR BALL
-		float liigu[3] = { 0, 0, 0.3 };
-		//thread t1(movement, liigu, speed);
-		//t1.detach();
-		}
-		*/
+		
 	}
-//}
 
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	Mat frame, pall_thresh, goal_thresh;
@@ -686,26 +433,96 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 
 	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
 	
-	//black lines
-	/*
-	Mat black_thresh = preprocess(frame,0, 0, 0,255, 200, 70);
-	vector<Vec2f> lines;
-	HoughLines(black_thresh, lines, 1, CV_PI / 180, 150, 0, 0);
-	for (size_t i = 0; i < lines.size(); i++){
-		float rho = lines[i][0], theta = lines[i][1];
-		Point pt1, pt2;
-		double a = cos(theta), b = sin(theta);
-		double x0 = a*rho, y0 = b*rho;
-		pt1.x = cvRound(x0 + 1000 * (-b));
-		pt1.y = cvRound(y0 + 1000 * (a));
-		pt2.x = cvRound(x0 - 1000 * (-b));
-		pt2.y = cvRound(y0 - 1000 * (a));
-		line(frame, pt1, pt2, Scalar(0, 0, 0), 3, CV_AA);
-	}
-	*/
 	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
 
+class SerialClass{
+public:
+	SerialClass() :
+		port(io),
+		quitFlag(false){};
+
+	~SerialClass()
+	{
+		//Stop the I/O services
+		io.stop();
+		//Wait for the thread to finish
+		runner.join();
+	}
+
+	bool connect(const std::string& port_name, int baud = 19200)
+	{
+		using namespace boost::asio;
+		port.open(port_name);
+		//Setup port
+		port.set_option(serial_port::baud_rate(baud));
+		port.set_option(serial_port::flow_control(
+			serial_port::flow_control::none));
+
+		if (port.is_open())
+		{
+			//Start io-service in a background thread.
+			//boost::bind binds the ioservice instance
+			//with the method call
+			runner = boost::thread(
+				boost::bind(
+				&boost::asio::io_service::run,
+				&io));
+
+			startReceive();
+		}
+
+		return port.is_open();
+	}
+
+	void startReceive()
+	{
+		using namespace boost::asio;
+		//Issue a async receive and give it a callback
+		//onData that should be called when "\r\n"
+		//is matched.
+		async_read_until(port, buffer,
+			"\n",
+			boost::bind(&SerialClass::onData,
+			this, _1, _2));
+	}
+
+	void send(const std::string& text)
+	{
+		boost::asio::write(port, boost::asio::buffer(text));
+	}
+
+	void onData(const boost::system::error_code& e,
+		std::size_t size)
+	{
+
+		if (!e)
+		{
+			std::istream is(&buffer);
+			std::string data(size, '\0');
+			is.read(&data[0], size);
+
+			std::cout << "Received data:" << data;
+
+			//If we receive quit()\r\n indicate
+			//end of operations
+			quitFlag = (data.compare("quit()\r\n") == 0);
+		};
+
+		startReceive();
+	};
+
+	bool quit(){ return quitFlag; }
+
+private:
+	boost::asio::io_service io;
+	boost::asio::serial_port port;
+
+	boost::thread runner;
+	boost::asio::streambuf buffer;
+
+	bool quitFlag;
+};
 
 int main() {
 	Mat frame;
@@ -713,7 +530,6 @@ int main() {
 	float kaugus;
 	int speed = 150;
 	
-	tx("dm255");
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -732,25 +548,39 @@ int main() {
 	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
 	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
 
+	//connect to serial ports
+	SerialClass serial;//control motors etc
 
-	//thread to check if ball in dribbler
-	thread t3(parse);
-	t3.detach();
+	if (serial.connect("COM3", 19200))
+	{
+		std::cout << "Port is open." << std::endl;
+	}
+	else
+	{
+		std::cout << "Port open failed." << std::endl;
+	}
+	SerialClass serialref;//referee
+
+	if (serialref.connect("COM4", 19200))
+	{
+		std::cout << "Port is open." << std::endl;
+	}
+	else
+	{
+		std::cout << "Port open failed." << std::endl;
+	}
 
 	VideoCapture cap(0);//enter cam # or video location-------------------
 	if (!cap.isOpened()) return -1; //check if succeeded
 
-
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+
 	String goal = "yellow";
+
 	for (;;) {
-		//set_dribbler();
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
 
-		//float liigu[3] = { 1, 0, 0 };
-		//(liigu, 75);
-		
 		if (bl == '1'){
 			ball_in(mc_goal);
 		}
@@ -758,9 +588,6 @@ int main() {
 			no_ball(mc_ball, kaugus);
 			
 		}
-		
-		//float liigu[3] = { 1, 0, 0 };
-		//movement(liigu, 75);
 		imshow("orig", frame);
 		waitKey(10);
 	}
