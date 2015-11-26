@@ -27,9 +27,44 @@ movement(liigu, max_speed);
 #include <condition_variable>
 #include <future>
 #include <tuple>
+#include <boost\asio.hpp>
+#include <boost\asio\serial_port.hpp>
+#include <boost\system\error_code.hpp>
+#include <boost\system\system_error.hpp>
+#include <boost\bind.hpp>
+#include <boost\thread.hpp>
 
 using namespace cv;
 using namespace std;
+
+class Serial{
+	char read_msg_[512];
+	boost::asio::io_service m_io;
+	boost::asio::serial_port m_port;
+
+private:
+	void handler(const boost::system::error_code& error, size_t bytes_transferred){
+		read_msg_[bytes_transferred] = 0;
+		std::cout << bytes_transferred << " bytes: " << read_msg_ << std::endl;
+
+		read_some();
+	}
+
+	void read_some(){
+
+		m_port.async_read_some(boost::asio::buffer(read_msg_, 512),
+			boost::bind(&Serial::handler, this, boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+	}
+
+public:
+	Serial(const char *dev_name) :m_io(), m_port(m_io, dev_name){
+		read_some();
+
+		boost::thread t(boost::bind(&boost::asio::io_service::run, &m_io));
+	}
+};
+
+
 
 //global stuff
 std::mutex mu;
@@ -44,27 +79,27 @@ bool dribbler;
 bool suund;
 
 //sihtimise limiidid
-int vasak_limiit = 275;
-int parem_limiit = 365;
+int vasak_limiit =245;
+int parem_limiit = 395;
 
 int vasak_limiitG = 200;
 int parem_limiitG = 440;
 
 //initial values for trackbars
-int G_lowH1 = 50;
-int G_highH1 = 70;
-int G_lowS1 = 50;
-int G_highS1 = 150;
-int G_lowV1 = 50;
-int G_highV1 = 200;
+int G_lowH2 = 90;
+int G_highH2 =136;
+int G_lowS2 = 7;
+int G_highS2 = 150;
+int G_lowV2 =4;
+int G_highV2 = 200;
 
 //Yellow goal
-int G_lowH2 = 15;
-int G_highH2 = 40;
-int G_lowS2 = 100;
-int G_highS2 = 2255;
-int G_lowV2 = 100;
-int G_highV2 = 255;
+int G_lowH1 = 15;
+int G_highH1 = 40;
+int G_lowS1 = 100;
+int G_highS1 = 2255;
+int G_lowV1 = 70;
+int G_highV1 = 255;
 
 int B_lowH = 5;
 int B_highH = 25;
@@ -214,34 +249,42 @@ void parse(){//check if in dribbler
 		if (temp2.length() == 8){//if correct
 			bl = temp2[6];
 		}
-		sleepcp(25);
+		//sleepcp(25);
 	}
 }
 
 void tx(String command){
 	String port = "COM3";
-	cout << "wat" << endl;
+	//cout << "wat" << endl;
 	//while (true){
-
+	//unique_lock<mutex> lk(mu2);
+	while (1){
 		try {
-
+			//mu.lock();
+			//lk.lock();
 			serial::Serial my_serial(port, 19200, serial::Timeout::simpleTimeout(20));
+			
 			if (my_serial.isOpen()) {
-				mu.lock();
-				my_serial.write(command + "\n");
-				mu.unlock();
+				
+				//lk.lock();
+				my_serial.write(command + "\r\n");
+				//mu.unlock();
 				cout << "done" << endl;
+				break;
 				
 			}
+			
 			else{
 				cout << "nope" << endl;
 			}
+			//lk.unlock();
 		}
 		catch (exception &e) {
 			//cout << "error" << endl;
 		}
+	}
 	//}
-
+		
 }
 	
 	
@@ -352,8 +395,8 @@ void movement(float liigu[3], int max_speed){
 	//std::unique_lock<mutex> locker(mu);
 	//cond.wait(locker);
 
-	thread t1(move_robot, kiirused);
-	t1.detach();
+	move_robot( kiirused);
+	
 
 	//locker.unlock();
 }
@@ -388,8 +431,8 @@ void stop(){
 
 void set_dribbler(){
 	if (!dribbler){
-		thread tsend1(tx,"dm200");//!!!!!!!!!!!!!!!!!!!!!!!!!dm200 peab olema
-		tsend1.detach();
+		tx("dm200");//!!!!!!!!!!!!!!!!!!!!!!!!!dm200 peab olema
+		
 		cout << "start" << endl;
 		dribbler = true;
 	}
@@ -421,20 +464,62 @@ void kick(){
 void move_robot(int * kiirus){//PRODUCER
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
 	String port = "COM3";
-	String cmd1 = "3:sd" + to_string(kiirus[1]);
-	thread tsend(tx, cmd1);
-	tsend.detach();
-	String cmd2 = "2:sd" + to_string(kiirus[2]);
-	thread tsend2(tx, cmd2);
-	tsend2.detach();
-	String cmd3 = "1:sd" + to_string(kiirus[0]);
-	thread tsend3(tx, cmd3);
-	tsend3.detach();
+	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
+	thread test(tx,cmd1);
+	test.join();
+	//thread test(tx, cmd1);
+	//test.detach();
+	//sleepcp(100);
 	
+	//tsend.detach();
+	//String cmd2 = "2:sd" + to_string(kiirus[2])+"\r\n";
+	//tx(cmd2);
+	//thread tsend2(tx, cmd2);
+	//tsend2.detach();
+	//String cmd3 = "1:sd" + to_string(kiirus[0])+"\r\n";
+	///tx(cmd3);
+	//thread tsend3(tx, cmd3);
+	//tsend3.detach();
+	//stop();
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
-	set_dribbler();
+	
+	if (mc_goal.x != -1){//1. kiirus
+
+		if (mc_goal.x < vasak_limiit){//pöörame vasakule(1
+			if (suund == true){
+				float liigu[3] = { 0, 0, 0.2 };
+				movement(liigu, 45);
+			}
+			else{
+				float liigu[3] = { 0, 0, -0.3 };//vasakule
+				movement(liigu, 35);
+			}
+			suund = false;
+		}
+		else if (mc_goal.x > parem_limiit){
+			if (suund == false){
+				float liigu[3] = { 0, 0, 0.2 };
+				movement(liigu,45);
+			}
+			else{
+				float liigu[3] = { 0, 0, -0.3 };
+				movement(liigu, 35);
+			}
+			suund = true;
+		}
+		else if ((mc_goal.x<parem_limiit)&&(mc_goal.x>vasak_limiitG)){
+			tx("c\r\n");
+			sleepcp(1000);
+			tx("k\r\n");
+		}
+	}
+	else{
+		float liigu[3] = { 0, 0.2, 0.3 };
+		movement(liigu, 35);
+	}
+	/*set_dribbler();
 	int speed = 75;
 	if (mc_goal.x != -1){//värav vaateväljas
 		if (mc_goal.x < vasak_limiitG){//pöörame vasakule(1)
@@ -449,7 +534,7 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 		}
 		else {
 			stop();
-			charge();
+			//charge();
 			sleepcp(2000);
 			kick();
 		}
@@ -458,71 +543,110 @@ void ball_in(Point2f mc_goal){//ball in dribbler
 		float liigu[3] = { 0, 0, 0.3 };
 		movement( liigu, speed);
 		
-	}
+	}*/
 }
 
 void no_ball(Point2f mc_ball, float kaugus){
-	int speed = 150;
+	
+	//int speed = 150;
+	
 	//cout << "nope" << endl;
 	//keera palli suunale; pall on vaateväljas
 	if (mc_ball.x != -1){//1. kiirus
-		if (kaugus < 100){
-			set_dribbler();
-			speed = 100;
-			//cout << "1" << endl;
-		}
-		else{
-			stop_dribbler();
-			speed = 150;
-		}
-		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)//teine kiirus
-			float liigu[3] = { 0, 0, 0.3 };
-			if (suund = true){//eelmine paremale
-				movement(liigu, speed / 3);
+
+		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1
+			if (suund == true){
+				float liigu[3] = { 0, 0, -0.3 };
+				movement(liigu, 50);
 			}
 			else{
-			movement( liigu, speed);
+				float liigu[3] = { 0, 0, 0.2 };//vasakule
+				movement(liigu, 35);
 			}
-			suund = false;
-			
+			suund =false;
 		}
-		else if (mc_ball.x > parem_limiit){//paremale
-			cout << "parem" << endl;
-			float liigu[3] = { 0, 0, -0.3 };
-			if (suund = false){//eelmine vasakule
-				movement(liigu, speed / 3);
+		else if (mc_ball.x > parem_limiit){
+			if (suund == false){
+				float liigu[3] = { 0, 0, 0.3 };
+				movement(liigu, 50);
 			}
 			else{
-			movement( liigu, speed);
+				float liigu[3] = { 0, 0, -0.2 };
+				movement(liigu, 35);
 			}
 			suund = true;
 		}
-		else {
-			float liigu[3] = {0.5, 0, 0 };
-			if (suund == NULL){//eelmine ka otse
-				if (2 * speed > 250){
-					speed = 200;
-				}
-				else{
-					//nothing
-				}
-				movement(liigu, speed);
-			}
-			movement( liigu, 50);
+		else{
+			float liigu[3] = { 1, 0, 0 };
+			movement(liigu, 45);
 			suund = NULL;
-			
-			//cout << "otse" << endl;
 		}
-		
 	}
+	else{
+		float liigu[3] = { 0, 0.2, 0.3 }; 
+		movement(liigu, 35);
+	}
+		//sleepcp(100);
+		//stop();
+		/*
+		if (kaugus < 150){
+		set_dribbler();
+		speed = 100;
+		//cout << "1" << endl;
+		}
+		else{
+		stop_dribbler();
+		speed = 150;
+		}
+		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1)//teine kiirus
+		float liigu[3] = { 0, 0, 0.2 };
+		if (suund = true){//eelmine paremale
+		movement(liigu, speed / 4);
+		}
+		else{
+		movement( liigu, speed);
+		}
+		suund = false;
 
-	else{//SEARCH FOR BALL
+		}
+		else if (mc_ball.x > parem_limiit){//paremale
+		cout << "parem" << endl;
+		float liigu[3] = { 0, 0, -0.2 };
+		if (suund = false){//eelmine vasakule
+		movement(liigu, speed / 4);
+		}
+		else{
+		movement( liigu, speed);
+		}
+		suund = true;
+		}
+		else {
+		float liigu[3] = {0.5, 0, 0 };
+		if (suund == NULL){//eelmine ka otse
+		if (2 * speed > 250){
+		speed = 200;
+		}
+		else{
+		//nothing
+		}
+		movement(liigu, speed);
+		}
+		movement( liigu, 50);
+		suund = NULL;
+
+		//cout << "otse" << endl;
+		}
+
+		}
+
+		else{//SEARCH FOR BALL
 		float liigu[3] = { 0, 0, 0.3 };
 		//thread t1(movement, liigu, speed);
 		//t1.detach();
+		}
+		*/
 	}
-	
-}
+//}
 
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	Mat frame, pall_thresh, goal_thresh;
@@ -545,15 +669,17 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	float palli_kaugus = 2.5 * 1060 / (2 * raadius);
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-
+	goal = "yellow";
 	//GOAL
 	if (goal == "yellow"){
 		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
+		
 	}
-	else{
+	if(goal == "blue"){
 		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
 	}
-
+	imshow("goal",goal_thresh);
+	waitKey(30);
 	//imshow("goal", goal_thresh);
 	//waitKey(30);
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
@@ -586,8 +712,8 @@ int main() {
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
-	thread tsend(tx,"dm0");
-	dribbler = false;
+	
+	tx("dm255");
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -614,12 +740,16 @@ int main() {
 	VideoCapture cap(0);//enter cam # or video location-------------------
 	if (!cap.isOpened()) return -1; //check if succeeded
 
+
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 	String goal = "yellow";
 	for (;;) {
-		/*
+		//set_dribbler();
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
+
+		//float liigu[3] = { 1, 0, 0 };
+		//(liigu, 75);
 		
 		if (bl == '1'){
 			ball_in(mc_goal);
@@ -628,9 +758,9 @@ int main() {
 			no_ball(mc_ball, kaugus);
 			
 		}
-		*/
-		float liigu[3] = { 1, 0, 0 };
-		movement(liigu, 75);
+		
+		//float liigu[3] = { 1, 0, 0 };
+		//movement(liigu, 75);
 		imshow("orig", frame);
 		waitKey(10);
 	}
