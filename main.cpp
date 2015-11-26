@@ -27,9 +27,6 @@ movement(liigu, max_speed);
 using namespace cv;
 using namespace std;
 
-
-
-
 //global stuff
 vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black;
 vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black;
@@ -288,10 +285,7 @@ void set_dribbler(){
 
 void stop_dribbler(){
 	if (dribbler){
-		thread tsend2(tx, "dm0");
-		tsend2.detach();
-		cout << "stop" << endl;
-		dribbler = false;
+		
 	}
 }
 
@@ -313,9 +307,7 @@ void move_robot(int * kiirus){//PRODUCER
 	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
 	String port = "COM3";
 	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
-	thread test(tx,cmd1);
-	test.join();
-	
+
 }
 
 void ball_in(Point2f mc_goal){//ball in dribbler
