@@ -27,17 +27,132 @@ movement(liigu, max_speed);
 using namespace cv;
 using namespace std;
 
+bool stopbool = false;
+bool bl = false;
+
+class SerialClass{
+public:
+	SerialClass() :
+		port(io),
+		quitFlag(false){};
+
+	~SerialClass()
+	{
+		//Stop the I/O services
+		io.stop();
+		//Wait for the thread to finish
+		runner.join();
+	}
+
+	bool connect(const std::string& port_name, int baud = 19200)
+	{
+		using namespace boost::asio;
+		port.open(port_name);
+		//Setup port
+		port.set_option(serial_port::baud_rate(baud));
+		port.set_option(serial_port::flow_control(
+			serial_port::flow_control::none));
+
+		if (port.is_open())
+		{
+			//Start io-service in a background thread.
+			//boost::bind binds the ioservice instance
+			//with the method call
+			runner = boost::thread(
+				boost::bind(
+				&boost::asio::io_service::run,
+				&io));
+
+			startReceive();
+		}
+
+		return port.is_open();
+	}
+
+	void startReceive()
+	{
+		using namespace boost::asio;
+		//Issue a async receive and give it a callback
+		//onData that should be called when "\r\n"
+		//is matched.
+		async_read_until(port, buffer,
+			"\n",
+			boost::bind(&SerialClass::onData,
+			this, _1, _2));
+	}
+
+	void send(const std::string& text)
+	{
+		boost::asio::write(port, boost::asio::buffer(text));
+	}
+
+	void onData(const boost::system::error_code& e,
+		std::size_t size)
+	{
+
+		if (!e)
+		{
+			std::istream is(&buffer);
+			std::string data(size, '\0');
+			is.read(&data[0], size);
+
+			//std::cout << "Received data:" << data;
+			if ((data.length()>6) && ((data.compare("<4:bl:0>")) || (data.compare("<4:bl:1>")))){
+				char bl_det = data[6];
+				if (bl_det == '0'){
+					bl = false;
+				}
+				else if (bl_det == '1'){
+					bl = true;
+				}
+			}
+
+			char my_robotID = 'A';
+			char my_field = 'A';
+			if ((data.length() > 10) && (data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
+				if (data[1] == my_field){//command is for my field
+					if ((data[2] == 'X') || (data[2] == my_robotID)){//command is for everybody
+						if (data[5] == 'A'){//command is START
+							cout << "starting...." << endl;
+							stopbool = false;
+						}
+						else if (data[5] == 'O'){//command is STOP
+							cout << "stopping..." << endl;
+							stopbool = true;
+						}
+					}
+				}
+			}
+
+			//If we receive quit()\r\n indicate
+			//end of operations
+			quitFlag = (data.compare("quit()\r\n") == 0);
+		};
+
+		startReceive();
+	};
+
+	bool quit(){ return quitFlag; }
+
+private:
+	boost::asio::io_service io;
+	boost::asio::serial_port port;
+
+	boost::thread runner;
+	boost::asio::streambuf buffer;
+
+	bool quitFlag;
+};
+
 //global stuff
 vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black;
 vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black;
 
-char bl_det[];
-char bl;
 bool dribbler;
 bool suund;
 
 //sihtimise limiidid
-int vasak_limiit =245;
+int vasak_limiit = 245;
 int parem_limiit = 395;
 
 int vasak_limiitG = 200;
@@ -45,10 +160,10 @@ int parem_limiitG = 440;
 
 //initial values for trackbars
 int G_lowH2 = 90;
-int G_highH2 =136;
+int G_highH2 = 136;
 int G_lowS2 = 7;
 int G_highS2 = 150;
-int G_lowV2 =4;
+int G_lowV2 = 4;
 int G_highV2 = 200;
 
 //Yellow goal
@@ -70,24 +185,23 @@ int B_highV = 255;
 void sleepcp(int milliseconds);
 void move_robot(int * kiirus);
 
-void movement(float liigu[3], int max_speed);
+void movement(float liigu[3], int max_speed, SerialClass& serial);
 int ymarda(float a);
 int * get_speed(float * joud);
 float * move_vector(float liigu[3]);
 int ymarda(float a);
-void stop();
+void stop(bool stop, SerialClass& serial);
 String receive(String port, int length);
 
-String trrx();
-void set_dribbler(int speed);
-void stop_dribbler();
-void charge();
-void discharge();
-void kick();
-void move_robot(int * kiirus);
-void ball_in(Point2f mc_goal);
-void no_ball(Point2f mc_ball);
-void tx(String command);
+void set_dribbler(int speed, SerialClass& serial);
+void stop_dribbler(SerialClass& serial);
+void charge(SerialClass& serial);
+void discharge(SerialClass& serial);
+void kick(SerialClass& serial);
+void move_robot(int * kiirus, SerialClass& serial);
+void ball_in(Point2f mc_goal, SerialClass& serial);
+void no_ball(Point2f mc_ball, SerialClass& serial);
+
 
 void sleepcp(int milliseconds) // cross-platform sleep function
 {
@@ -200,39 +314,28 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 	}
 }
 
-void parse(){//check if in dribbler
-	for (;;){
-
-		String temp2 = trrx();
-		if (temp2.length() == 8){//if correct
-			bl = temp2[6];
-		}
-		//sleepcp(25);
-	}
-}
-
 float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
-		//liikumise maatriks, et ei peaks iga kord arvutama
-		float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
+	//liikumise maatriks, et ei peaks iga kord arvutama
+	float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
 
-			0, 0.66667, 0.33333 } };
-		float f1, f2, f3, x, y, w;
-		static float tagastus[3];//jõudude vektor mille pärast tagastame
+		0, 0.66667, 0.33333 } };
+	float f1, f2, f3, x, y, w;
+	static float tagastus[3];//jõudude vektor mille pärast tagastame
 
-		x = liigu[0];
-		y = liigu[1];
-		w = liigu[2];
+	x = liigu[0];
+	y = liigu[1];
+	w = liigu[2];
 
-		//arvutame iga mootori jõu
-		f1 = liikumine[0][0] * x + liikumine[0][1] * y + liikumine[0][2] * w;
-		f2 = liikumine[1][0] * x + liikumine[1][1] * y + liikumine[1][2] * w;
-		f3 = liikumine[2][0] * x + liikumine[2][1] * y + liikumine[2][2] * w;
+	//arvutame iga mootori jõu
+	f1 = liikumine[0][0] * x + liikumine[0][1] * y + liikumine[0][2] * w;
+	f2 = liikumine[1][0] * x + liikumine[1][1] * y + liikumine[1][2] * w;
+	f3 = liikumine[2][0] * x + liikumine[2][1] * y + liikumine[2][2] * w;
 
-		tagastus[0] = f1;
-		tagastus[1] = f2;
-		tagastus[2] = f3;
+	tagastus[0] = f1;
+	tagastus[1] = f2;
+	tagastus[2] = f3;
 
-		return tagastus;
+	return tagastus;
 }
 
 int * get_speed(float * joud, int max_speed){
@@ -257,135 +360,108 @@ int ymarda(float a){
 	else return 0;
 }
 
-void movement(float liigu[3], int max_speed){
+void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
 	jouvektor = move_vector(liigu);
 
 	int *kiirused;
-	kiirused = get_speed(jouvektor, max_speed);//!!!!!!!!!!!!!!!!!!!!!!
+	kiirused = get_speed(jouvektor, max_speed);
 
-	move_robot( kiirused);
+	move_robot(kiirused, serial);
 
 }
 
-void stop(){
-	float liigu[3] = { 0, 0, 0 };
-	int speed = 0;
-	movement(liigu, speed);
-}
-
-void set_dribbler(){
-	if (!dribbler){
-		tx("dm200");//!!!!!!!!!!!!!!!!!!!!!!!!!dm200 peab olema
-		
-		cout << "start" << endl;
-		dribbler = true;
+void stop(bool stop, SerialClass& serial){
+	//freeze while stopped, if stop == false, continue
+	while (stop){
+		float liigu[3] = { 0, 0, 0 };
+		int speed = 0;
+		movement(liigu, speed, serial);
 	}
 }
 
-void stop_dribbler(){
-	if (dribbler){
-		
-	}
-}
-
-void charge(){
-	tx("c");
-}
-
-void discharge(){
-	for (int i = 0; i < 20; i++){
-		kick();
-	}
-}
-
-void kick(){
-	tx("k");
-}
-
-void move_robot(int * kiirus){//PRODUCER
-	//NB 3 ja 1 mootori id hetkel vahetuses, sellepärast antakse 1. mootori kiirus kolmandale jms
-	String port = "COM3";
+void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
-
+	cout << "------------------------------------------" << endl;
+	cout << cmd1 << endl;
+	serial.send(cmd1);
 }
 
-void ball_in(Point2f mc_goal){//ball in dribbler
-	
-	if (mc_goal.x != -1){//1. kiirus
-
-		if (mc_goal.x < vasak_limiit){//pöörame vasakule(1
-			if (suund == true){
-				float liigu[3] = { 0, 0, 0.2 };
-				movement(liigu, 45);
-			}
-			else{
-				float liigu[3] = { 0, 0, -0.3 };//vasakule
-				movement(liigu, 35);
-			}
-			suund = false;
-		}
-		else if (mc_goal.x > parem_limiit){
-			if (suund == false){
-				float liigu[3] = { 0, 0, 0.2 };
-				movement(liigu,45);
-			}
-			else{
-				float liigu[3] = { 0, 0, -0.3 };
-				movement(liigu, 35);
-			}
-			suund = true;
-		}
-		else if ((mc_goal.x<parem_limiit)&&(mc_goal.x>vasak_limiitG)){
-			tx("c\r\n");
-			sleepcp(1000);
-			tx("k\r\n");
-		}
+void set_dribbler(int speed, SerialClass& serial){
+	String cmd = "";
+	if ((speed > 0) && (speed < 250)){
+		cmd = ("dm" + to_string(speed) + "\r\n");
+	}
+	else if (speed > 250){
+		cmd = ("dm250\r\n");
 	}
 	else{
-		float liigu[3] = { 0, 0.2, 0.3 };
-		movement(liigu, 35);
+		cmd = ("dm0\r\n");
+	}
+	//cout << cmd << endl;
+	serial.send(cmd);
+}
+
+void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
+	int hs = 150;
+	int ms = 100;
+	int ls = 50;
+	cout << bl << endl;
+
+	if (mc_goal.x == -1){
+		//search for ball
+		float liigu[3] = { 0, 0, 1 };//paremale
+		movement(liigu, 30, serial);
+	}
+	else if (mc_goal.x < 260){
+		float liigu[3] = { 0, 0, -1 };//vasakule
+		movement(liigu, ms, serial);
+	}
+	else if (mc_goal.x > 380){
+		float liigu[3] = { 0, 0, 1 };//par4emale
+		movement(liigu, ms, serial);
+	}
+	else if ((mc_goal.x > 259) && (mc_goal.x < 381)){
+		float liigu[3] = { 0, 0, 0 };//par4emale
+		movement(liigu, 0, serial);
+		serial.send("c\r\n");
+		sleepcp(2000);
+		serial.send("k\r\n");
+		bl = false;
 	}
 }
 
-void no_ball(Point2f mc_ball, float kaugus){
-	//keera palli suunale; pall on vaateväljas
-	if (mc_ball.x != -1){//1. kiirus
+void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
+	int hs = 150;
+	int ms = 100;
+	int ls = 50;
 
-		if (mc_ball.x < vasak_limiit){//pöörame vasakule(1
-			if (suund == true){
-				float liigu[3] = { 0, 0, -0.3 };
-				movement(liigu, 50);
-			}
-			else{
-				float liigu[3] = { 0, 0, 0.2 };//vasakule
-				movement(liigu, 35);
-			}
-			suund =false;
+	if (mc_ball.x == -1){
+		//search for ball
+		float liigu[3] = { 0, 0, 1 };//paremale
+		movement(liigu, ls, serial);
+	}
+	else if (mc_ball.x < 275){
+		float liigu[3] = { 0, 0, -1 };//vasakule
+		movement(liigu, ms, serial);
+	}
+	else if (mc_ball.x > 365){
+		float liigu[3] = { 0, 0, 1 };//par4emale
+		movement(liigu, ms, serial);
+	}
+	else if ((mc_ball.x > 274) && (mc_ball.x < 366)){
+		float liigu[3] = { 1, 0, 0 };//otse
+		if (kaugus > 150){
+			movement(liigu, hs, serial);
 		}
-		else if (mc_ball.x > parem_limiit){
-			if (suund == false){
-				float liigu[3] = { 0, 0, 0.3 };
-				movement(liigu, 50);
-			}
-			else{
-				float liigu[3] = { 0, 0, -0.2 };
-				movement(liigu, 35);
-			}
-			suund = true;
+		else if (kaugus < 50){
+			movement(liigu, ls, serial);
 		}
 		else{
-			float liigu[3] = { 1, 0, 0 };
-			movement(liigu, 45);
-			suund = NULL;
+			movement(liigu, ms, serial);
 		}
 	}
-	else{
-		float liigu[3] = { 0, 0.2, 0.3 }; 
-		movement(liigu, 35);
-	}
-		
-	}
+}
 
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	Mat frame, pall_thresh, goal_thresh;
@@ -405,123 +481,43 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 
 	//arvutame palli !umbkaudse! kauguse kaamerast
 	//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
-	float palli_kaugus = 2.5 * 1060 / (2 * raadius);
+	float palli_kaugus;
+	if (raadius != 0){
+		palli_kaugus = 2.5 * 1060 / (2 * raadius);
+	}
+	else{
+		palli_kaugus = -1;
+	}
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
 	goal = "yellow";
 	//GOAL
 	if (goal == "yellow"){
 		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
-		
+
 	}
-	if(goal == "blue"){
+	if (goal == "blue"){
 		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
 	}
-	imshow("goal",goal_thresh);
+	imshow("goal", goal_thresh);
 	waitKey(30);
 	//imshow("goal", goal_thresh);
 	//waitKey(30);
-	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE,CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	Point2f mc_goal = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-	
+
 	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
 
-class SerialClass{
-public:
-	SerialClass() :
-		port(io),
-		quitFlag(false){};
 
-	~SerialClass()
-	{
-		//Stop the I/O services
-		io.stop();
-		//Wait for the thread to finish
-		runner.join();
-	}
-
-	bool connect(const std::string& port_name, int baud = 19200)
-	{
-		using namespace boost::asio;
-		port.open(port_name);
-		//Setup port
-		port.set_option(serial_port::baud_rate(baud));
-		port.set_option(serial_port::flow_control(
-			serial_port::flow_control::none));
-
-		if (port.is_open())
-		{
-			//Start io-service in a background thread.
-			//boost::bind binds the ioservice instance
-			//with the method call
-			runner = boost::thread(
-				boost::bind(
-				&boost::asio::io_service::run,
-				&io));
-
-			startReceive();
-		}
-
-		return port.is_open();
-	}
-
-	void startReceive()
-	{
-		using namespace boost::asio;
-		//Issue a async receive and give it a callback
-		//onData that should be called when "\r\n"
-		//is matched.
-		async_read_until(port, buffer,
-			"\n",
-			boost::bind(&SerialClass::onData,
-			this, _1, _2));
-	}
-
-	void send(const std::string& text)
-	{
-		boost::asio::write(port, boost::asio::buffer(text));
-	}
-
-	void onData(const boost::system::error_code& e,
-		std::size_t size)
-	{
-
-		if (!e)
-		{
-			std::istream is(&buffer);
-			std::string data(size, '\0');
-			is.read(&data[0], size);
-
-			std::cout << "Received data:" << data;
-
-			//If we receive quit()\r\n indicate
-			//end of operations
-			quitFlag = (data.compare("quit()\r\n") == 0);
-		};
-
-		startReceive();
-	};
-
-	bool quit(){ return quitFlag; }
-
-private:
-	boost::asio::io_service io;
-	boost::asio::serial_port port;
-
-	boost::thread runner;
-	boost::asio::streambuf buffer;
-
-	bool quitFlag;
-};
 
 int main() {
 	Mat frame;
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
-	
+
 	//trackbar creation
 	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
 	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
@@ -567,18 +563,28 @@ int main() {
 
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-
 	String goal = "yellow";
 
+	serial.send("c\r\n");
+	//serial.send("dm250\r\n");
+
 	for (;;) {
+		if (stopbool == true){
+			//cout << stopbool << endl;
+			stop(stopbool, serial);
+		}
+
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
 
-		if (bl == '1'){
-			ball_in(mc_goal);
+		serial.send("bl\r\n");
+		sleepcp(10);
+		cout << bl;
+		if (bl == true){
+			ball_in(mc_goal, serial);
 		}
-		else if (bl == '0'){
-			no_ball(mc_ball, kaugus);
-			
+		else {
+			no_ball(mc_ball, kaugus, serial);
+
 		}
 		imshow("orig", frame);
 		waitKey(10);
