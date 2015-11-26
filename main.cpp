@@ -374,10 +374,13 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 void stop(bool stop, SerialClass& serial){
 	//freeze while stopped, if stop == false, continue
 	while (stop){
+		serial.send("dm0\r\n");
 		float liigu[3] = { 0, 0, 0 };
 		int speed = 0;
+		serial.send("k\r\n");
 		movement(liigu, speed, serial);
 	}
+	serial.send("dm250\r\n");
 }
 
 void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
@@ -415,11 +418,11 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 	}
 	else if (mc_goal.x < 260){
 		float liigu[3] = { 0, 0, -1 };//vasakule
-		movement(liigu, ms, serial);
+		movement(liigu, ls, serial);
 	}
 	else if (mc_goal.x > 380){
 		float liigu[3] = { 0, 0, 1 };//par4emale
-		movement(liigu, ms, serial);
+		movement(liigu, ls, serial);
 	}
 	else if ((mc_goal.x > 259) && (mc_goal.x < 381)){
 		float liigu[3] = { 0, 0, 0 };//par4emale
@@ -566,7 +569,7 @@ int main() {
 	String goal = "yellow";
 
 	serial.send("c\r\n");
-	//serial.send("dm250\r\n");
+	serial.send("dm250\r\n");
 
 	for (;;) {
 		if (stopbool == true){
