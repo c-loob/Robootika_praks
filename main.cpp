@@ -118,9 +118,10 @@ public:
 			std::string data(size, '\0');
 			is.read(&data[0], size);
 
-			if (((data.length()>6) && (data.compare("<4:bl:0>"))) || ((data.length()>6)&&(data.compare("<4:bl:1>")))){
+			if (((data.length()>6) && (data.compare("<4:bl:0>\n")==0)) || ((data.length()>6)&&(data.compare("<4:bl:1>\n")==0))){
+				
 				char bl_det = data[6];
-				cout << bl_det;
+				cout << data<< endl;
 				if (bl_det == '0'){
 					bl = false;
 				}
@@ -129,7 +130,7 @@ public:
 				}
 			}
 			else{
-			cout << data << endl;
+			//cout << data << endl;
 			char my_robotID = 'A';
 			char my_field = 'A';
 			if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
@@ -320,21 +321,35 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Poi
 			}
 		}
 		float biggest_contour_area = 0;
-		int biggest_contour_id = -1;
+		int biggest_contour_id = 0;
 
 		for (int i = 0; i < contours.size(); i++) {
 			//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
 			float ctArea = contourArea(contours[i]);
 			if (ctArea > biggest_contour_area) {
 				float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
+				//if (sqrt(ctArea / 3.1415)>1500){//take black lines into account only if ball is relatively close
 				if (ball_dist < black_dist){
 					biggest_contour_area = ctArea;
 					biggest_contour_id = i;
 				}
+				
+				/*}
+				else{
+					biggest_contour_area = ctArea;
+					biggest_contour_id = i;
+				}*/
 			}
 		}
 		float r = sqrt(biggest_contour_area / 3.1415);
-		circle(frame, mc[biggest_contour_id], r, Scalar(255, 0, 0), -1, 8, 0);
+		//cout << "r= " << biggest_contour_area;
+		if (biggest_contour_id != -1){
+			circle(frame, mc[biggest_contour_id], r, Scalar(255, 0, 0), -1, 8, 0);
+		}
+		else{
+			mc[biggest_contour_id].x = -1;
+			mc[biggest_contour_id].y = -1;
+		}
 		return make_pair(mc[biggest_contour_id], r);
 	}
 	else {
@@ -514,7 +529,7 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 30);
-	findContours(goal_thresh, contours_black, hierarchy_black, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	findContours(black_thresh, contours_black, hierarchy_black, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 	Point2f mc_black = process_goal(contours_black, frame, Scalar(0, 0, 0));
 
 	pair<Point2f, float> result = process_ball(contours_ball, frame, mc_black);
@@ -625,25 +640,32 @@ int main() {
 	//serial.send("dm255\r\n");
 
 	serialref.send("+++");
-
+	bool tribler = false;
 	for (;;) {
 		if (stopbool == true){
 			stop(stopbool, serial);
 		}
 
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
-		
+		if ((kaugus < 100) && (tribler == false) && (kaugus >0)){
+			set_dribbler(255, serial);
+		}
+		if (((kaugus > 100) && (tribler == true))||(kaugus==-1)&&(bl==false)){
+			set_dribbler(0, serial);
+		}
 		serial.send("bl\r\n");
 		sleepcp(10);
 		if (bl == true){
 			ball_in(mc_goal, serial);
 			//set_dribbler(200, serial);
+			if (tribler == false){
+				set_dribbler(255, serial);
+				tribler = true;
+			}
 		}
 		else {
 			no_ball(mc_ball, kaugus, serial);
-			//set_dribbler(0, serial);
-
-		}
+			}
 		imshow("orig", frame);
 		waitKey(10);
 	}
