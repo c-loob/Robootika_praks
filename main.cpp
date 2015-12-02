@@ -368,8 +368,9 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 	jouvektor = move_vector(liigu);
 
 	int *kiirused;
-	kiirused = get_speed(jouvektor, max_speed);
-	//kiirused = get_speed(jouvektor, 0);
+	//leia mind
+	//kiirused = get_speed(jouvektor, max_speed);
+	kiirused = get_speed(jouvektor, 0);
 
 	move_robot(kiirused, serial);
 
@@ -574,6 +575,8 @@ int main() {
 
 	//serial.send("c\r\n");
 	//serial.send("dm255\r\n");
+
+	set_dribbler(200, serial);
 
 	for (;;) {
 		if (stopbool == true){
