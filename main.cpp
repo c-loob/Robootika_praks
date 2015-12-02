@@ -291,7 +291,12 @@ Point2f process_goal(vector<vector<Point>> contours, Mat frame, Scalar varv) {
 }
 
 //väljastab ainult kõige suurema kontuuri, raadiuse
-pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
+pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Point2f mc_black) {
+	float b_x = mc_black.x;
+	float b_y = mc_black.y;
+	
+	float black_dist = sqrt((b_x - 320)*(b_x - 320) + (b_y - 480)*(b_y - 480));
+
 	vector<Moments> mu(contours.size());
 	for (int i = 0; i < contours.size(); i++)
 	{
@@ -321,8 +326,11 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 			//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
 			float ctArea = contourArea(contours[i]);
 			if (ctArea > biggest_contour_area) {
-				biggest_contour_area = ctArea;
-				biggest_contour_id = i;
+				float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
+				if (ball_dist < black_dist){
+					biggest_contour_area = ctArea;
+					biggest_contour_id = i;
+				}
 			}
 		}
 		float r = sqrt(biggest_contour_area / 3.1415);
@@ -505,7 +513,11 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 
 	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-	pair<Point2f, float> result = process_ball(contours_ball, frame);
+	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 30);
+	findContours(goal_thresh, contours_black, hierarchy_black, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	Point2f mc_black = process_goal(contours_black, frame, Scalar(0, 0, 0));
+
+	pair<Point2f, float> result = process_ball(contours_ball, frame, mc_black);
 	mc_ball = result.first;
 	float raadius = result.second;
 
@@ -529,8 +541,9 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	if (goal == "blue"){
 		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
 	}
+	
+	
 	/*
-	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 30);
 	vector<Vec4i> lines;
 	HoughLinesP(black_thresh, lines, 1, CV_PI / 180, 200, 100, 10);
 	
