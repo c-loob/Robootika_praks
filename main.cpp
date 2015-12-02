@@ -497,7 +497,7 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	}
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-	goal = "blue";
+	
 	//GOAL
 	if (goal == "yellow"){
 		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
