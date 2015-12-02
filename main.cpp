@@ -97,7 +97,7 @@ public:
 			is.read(&data[0], size);
 
 			//std::cout << "Received data:" << data;
-			if ((data.length()>6) && ((data.compare("<4:bl:0>")) || (data.compare("<4:bl:1>")))){
+			if (((data.length()>6) && (data.compare("<4:bl:0>"))) || ((data.length()>6)&&(data.compare("<4:bl:1>")))){
 				char bl_det = data[6];
 				if (bl_det == '0'){
 					bl = false;
@@ -106,10 +106,11 @@ public:
 					bl = true;
 				}
 			}
-
+			else{
+			cout << data << endl;
 			char my_robotID = 'A';
 			char my_field = 'A';
-			if ((data.length() > 10) && (data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
+			if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
 				if (data[1] == my_field){//command is for my field
 					if ((data[2] == 'X') || (data[2] == my_robotID)){//command is for everybody
 						if (data[5] == 'A'){//command is START
@@ -122,6 +123,7 @@ public:
 						}
 					}
 				}
+			}
 			}
 
 			//If we receive quit()\r\n indicate
@@ -160,11 +162,11 @@ int parem_limiitG = 440;
 
 //initial values for trackbars
 int G_lowH2 = 90;
-int G_highH2 = 136;
-int G_lowS2 = 7;
-int G_highS2 = 150;
-int G_lowV2 = 4;
-int G_highV2 = 200;
+int G_highH2 = 108;
+int G_lowS2 = 160;
+int G_highS2 = 255;
+int G_lowV2 = 70;
+int G_highV2 = 221;
 
 //Yellow goal
 int G_lowH1 = 15;
@@ -174,6 +176,7 @@ int G_highS1 = 2255;
 int G_lowV1 = 70;
 int G_highV1 = 255;
 
+//blue goal
 int B_lowH = 5;
 int B_highH = 25;
 int B_lowS = 80;
@@ -366,6 +369,7 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 
 	int *kiirused;
 	kiirused = get_speed(jouvektor, max_speed);
+	//kiirused = get_speed(jouvektor, 0);
 
 	move_robot(kiirused, serial);
 
@@ -385,8 +389,8 @@ void stop(bool stop, SerialClass& serial){
 
 void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
-	cout << "------------------------------------------" << endl;
-	cout << cmd1 << endl;
+	//cout << "------------------------------------------" << endl;
+	//cout << cmd1 << endl;
 	serial.send(cmd1);
 }
 
@@ -406,25 +410,25 @@ void set_dribbler(int speed, SerialClass& serial){
 }
 
 void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
-	int hs = 150;
-	int ms = 100;
-	int ls = 50;
+	int hs = 100;
+	int ms = 50;
+	int ls = 30;
 	cout << bl << endl;
 
 	if (mc_goal.x == -1){
 		//search for ball
-		float liigu[3] = { 0, 0, 1 };//paremale
+		float liigu[3] = { 0, -0.3, -0.5 };//paremale
 		movement(liigu, 30, serial);
 	}
-	else if (mc_goal.x < 260){
-		float liigu[3] = { 0, 0, -1 };//vasakule
+	else if (mc_goal.x < 280){
+		float liigu[3] = { 0, 0.3, 0.5 };//vasakule
 		movement(liigu, ls, serial);
 	}
-	else if (mc_goal.x > 380){
-		float liigu[3] = { 0, 0, 1 };//par4emale
+	else if (mc_goal.x > 360){
+		float liigu[3] = { 0, -0.3, -0.5 };//par4emale
 		movement(liigu, ls, serial);
 	}
-	else if ((mc_goal.x > 259) && (mc_goal.x < 381)){
+	else if ((mc_goal.x > 279) && (mc_goal.x < 361)){
 		float liigu[3] = { 0, 0, 0 };//par4emale
 		movement(liigu, 0, serial);
 		serial.send("c\r\n");
@@ -435,21 +439,21 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 }
 
 void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
-	int hs = 150;
-	int ms = 100;
-	int ls = 50;
+	int hs = 120;
+	int ms = 50;
+	int ls = 30;
 
 	if (mc_ball.x == -1){
 		//search for ball
-		float liigu[3] = { 0, 0, 1 };//paremale
+		float liigu[3] = { 0, -0.3, -0.5 };//paremale
 		movement(liigu, ls, serial);
 	}
 	else if (mc_ball.x < 275){
-		float liigu[3] = { 0, 0, -1 };//vasakule
+		float liigu[3] = { 0, 0.3, 0.5 };//vasakule
 		movement(liigu, ms, serial);
 	}
 	else if (mc_ball.x > 365){
-		float liigu[3] = { 0, 0, 1 };//par4emale
+		float liigu[3] = { 0, -0.3, -0.5 };//par4emale
 		movement(liigu, ms, serial);
 	}
 	else if ((mc_ball.x > 274) && (mc_ball.x < 366)){
@@ -493,7 +497,7 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	}
 	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
 		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-	goal = "yellow";
+	goal = "blue";
 	//GOAL
 	if (goal == "yellow"){
 		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
@@ -568,8 +572,8 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 	String goal = "yellow";
 
-	serial.send("c\r\n");
-	serial.send("dm250\r\n");
+	//serial.send("c\r\n");
+	//serial.send("dm255\r\n");
 
 	for (;;) {
 		if (stopbool == true){
@@ -581,7 +585,7 @@ int main() {
 
 		serial.send("bl\r\n");
 		sleepcp(10);
-		cout << bl;
+		//cout << bl;
 		if (bl == true){
 			ball_in(mc_goal, serial);
 		}
