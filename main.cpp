@@ -53,7 +53,7 @@ public:
 		port.set_option(serial_port::flow_control(
 			serial_port::flow_control::none));
 
-		if (port.is_open())
+		if ((port.is_open())&&(port_name.compare("COM4")))//if is open AND is NOT COM4
 		{
 			//Start io-service in a background thread.
 			//boost::bind binds the ioservice instance
@@ -65,6 +65,15 @@ public:
 
 			startReceive();
 		}
+		else{
+			runner = boost::thread(
+				boost::bind(
+				&boost::asio::io_service::run,
+				&io));
+
+			listenReferee();
+		}
+		
 
 		return port.is_open();
 	}
@@ -81,6 +90,19 @@ public:
 			this, _1, _2));
 	}
 
+	void listenReferee()
+	{
+		using namespace boost::asio;
+		//Issue a async receive and give it a callback
+		//onData that should be called when "\r\n"
+		//is matched.
+		async_read_until(port, buffer,
+			"\r",
+			boost::bind(&SerialClass::onData,
+			this, _1, _2));
+	}
+
+
 	void send(const std::string& text)
 	{
 		boost::asio::write(port, boost::asio::buffer(text));
@@ -96,9 +118,9 @@ public:
 			std::string data(size, '\0');
 			is.read(&data[0], size);
 
-			//std::cout << "Received data:" << data;
 			if (((data.length()>6) && (data.compare("<4:bl:0>"))) || ((data.length()>6)&&(data.compare("<4:bl:1>")))){
 				char bl_det = data[6];
+				cout << bl_det;
 				if (bl_det == '0'){
 					bl = false;
 				}
@@ -390,8 +412,6 @@ void stop(bool stop, SerialClass& serial){
 
 void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
 	String cmd1 = "3:sd" + to_string(kiirus[1]) + "\r\n" + "2:sd" + to_string(kiirus[2]) + "\r\n" + "1:sd" + to_string(kiirus[0]) + "\r\n";
-	//cout << "------------------------------------------" << endl;
-	//cout << cmd1 << endl;
 	serial.send(cmd1);
 }
 
@@ -406,7 +426,6 @@ void set_dribbler(int speed, SerialClass& serial){
 	else{
 		cmd = ("dm0\r\n");
 	}
-	//cout << cmd << endl;
 	serial.send(cmd);
 }
 
@@ -414,7 +433,6 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 	int hs = 100;
 	int ms = 50;
 	int ls = 0;
-	cout << bl << endl;
 
 	if (mc_goal.x == -1){
 		//search for ball
@@ -593,19 +611,17 @@ int main() {
 	//serial.send("c\r\n");
 	//serial.send("dm255\r\n");
 
-	
+	serialref.send("+++");
 
 	for (;;) {
 		if (stopbool == true){
-			//cout << stopbool << endl;
 			stop(stopbool, serial);
 		}
 
 		tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
-
+		
 		serial.send("bl\r\n");
 		sleepcp(10);
-		//cout << bl;
 		if (bl == true){
 			ball_in(mc_goal, serial);
 			//set_dribbler(200, serial);
