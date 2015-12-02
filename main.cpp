@@ -369,8 +369,8 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 
 	int *kiirused;
 	//leia mind
-	//kiirused = get_speed(jouvektor, max_speed);
-	kiirused = get_speed(jouvektor, 0);
+	kiirused = get_speed(jouvektor, max_speed);
+	//kiirused = get_speed(jouvektor, 0);
 
 	move_robot(kiirused, serial);
 
@@ -413,13 +413,13 @@ void set_dribbler(int speed, SerialClass& serial){
 void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 	int hs = 100;
 	int ms = 50;
-	int ls = 30;
+	int ls = 0;
 	cout << bl << endl;
 
 	if (mc_goal.x == -1){
 		//search for ball
 		float liigu[3] = { 0, -0.3, -0.5 };//paremale
-		movement(liigu, 30, serial);
+		movement(liigu, ls, serial);
 	}
 	else if (mc_goal.x < 280){
 		float liigu[3] = { 0, 0.3, 0.5 };//vasakule
@@ -443,6 +443,10 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 	int hs = 120;
 	int ms = 50;
 	int ls = 30;
+
+	hs = 0;
+	ms = 0;
+	ls = 0;
 
 	if (mc_ball.x == -1){
 		//search for ball
@@ -472,7 +476,7 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 }
 
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
-	Mat frame, pall_thresh, goal_thresh;
+	Mat frame, pall_thresh, goal_thresh, black_thresh, black_result;
 	cap >> frame;
 	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
 
@@ -507,8 +511,21 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
 	if (goal == "blue"){
 		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
 	}
-	imshow("goal", goal_thresh);
-	waitKey(30);
+	/*
+	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 30);
+	vector<Vec4i> lines;
+	HoughLinesP(black_thresh, lines, 1, CV_PI / 180, 200, 100, 10);
+	
+	
+	for (size_t i = 0; i < lines.size(); i++)
+	{
+		line(frame, Point(lines[i][0], lines[i][1]),
+			Point(lines[i][2], lines[i][3]), Scalar(255, 255, 255), 3, 8);
+	}
+	
+	*/
+	//imshow("goal", goal_thresh);
+	//waitKey(30);
 	//imshow("goal", goal_thresh);
 	//waitKey(30);
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
@@ -576,7 +593,7 @@ int main() {
 	//serial.send("c\r\n");
 	//serial.send("dm255\r\n");
 
-	set_dribbler(200, serial);
+	
 
 	for (;;) {
 		if (stopbool == true){
@@ -591,9 +608,11 @@ int main() {
 		//cout << bl;
 		if (bl == true){
 			ball_in(mc_goal, serial);
+			//set_dribbler(200, serial);
 		}
 		else {
 			no_ball(mc_ball, kaugus, serial);
+			//set_dribbler(0, serial);
 
 		}
 		imshow("orig", frame);
