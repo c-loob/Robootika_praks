@@ -289,18 +289,17 @@ void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
 	serial.send(cmd1);
 }
 
-void set_dribbler(int speed, SerialClass& serial){
+void set_dribbler(SerialClass& serial){
 	String cmd = "";
-	if ((speed > 0) && (speed < 250)){
-		cmd = ("dm" + to_string(speed) + "\r\n");
-	}
-	else if (speed > 250){
-		cmd = ("dm250\r\n");
-	}
-	else{
-		cmd = ("dm0\r\n");
-	}
+	cmd = "dm150\r\n";
 	serial.send(cmd);
+	sleepcp(500);
+	cmd = ("dm125\r\n");
+	serial.send(cmd);
+}
+
+void stop_dribbler(SerialClass& serial){
+	serial.send("dm0\r\n");
 }
 
 void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
@@ -334,35 +333,135 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 	}
 }
 
-void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
-	int hs = 75;
-	int ms = 75;
-	int ls = 50;
-	
-	if (mc_ball.x == -1){
-		//search for ball
-		float liigu[3] = { 0, -0.3, -0.5 };//paremale
-		movement(liigu, ls, serial);
+void stop_movement(SerialClass& serial){
+	float liigu[3] = { 0, 0, 0 };
+	movement(liigu, 0, serial);
+}
+
+void turn16(bool direction, SerialClass& serial){//direction 
+	float turnamount = 0.5;//pos == vasakule
+	int speed = 50;
+	float liigu[3] = { 0, 0, 0 };
+	if (direction == true){
+		float liigu[3] = { 0, 0, turnamount };
 	}
-	else if (mc_ball.x < 255){
-		float liigu[3] = { 0, 0.3, 0.5 };//vasakule
-		movement(liigu, ms, serial);
+	else{
+		float liigu[3] = { 0, 0, -turnamount };
 	}
-	else if (mc_ball.x > 385){
-		float liigu[3] = { 0, -0.3, -0.5 };//par4emale
-		movement(liigu, ms, serial);
+	movement(liigu, speed, serial);
+}
+
+void turn(int speed, bool direction, SerialClass& serial){
+	stop_movement(serial);//leiamind
+
+	float liigu[3] = { 0, 0, 0 };
+	if (direction == true){//vasakule
+		float liigu[3] = { 0, 0, 0.5 };
 	}
-	else if ((mc_ball.x > 254) && (mc_ball.x < 386)){
-		float liigu[3] = { 1, 0, 0 };//otse
-		if (kaugus > 150){
-			movement(liigu, hs, serial);
+	else{
+		float liigu[3] = { 0, 0, -0.5 };
+	}
+	movement(liigu, speed, serial);
+}
+
+void aim_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
+	Mat frame;
+	Point2f mc;
+	while (true){
+		get_frame_goal(cap, goal);
+
+		if (mc.x == -1){
+			break;
 		}
-		else if (kaugus < 50){
-			movement(liigu, ls, serial);
+		if (mc.x < 255){
+			turn(30, true, serial);
+		}
+		else if (mc.x > 385){
+			turn(30, false, serial);
 		}
 		else{
-			movement(liigu, ms, serial);
+			break;
 		}
+		
+	}
+}
+
+void find_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
+	stop_dribbler(serial);
+
+	Mat frame;
+	Point2f mc;
+
+	while (mc.x == -1){
+		for (int i = 0; i < 6; i++){//max 6 times
+			tie(frame, mc) = get_frame_goal(cap, goal);
+			if (mc.x != -1){
+				break;
+			}
+			else{
+				turn16(true, serial);//vasakule
+			}
+		}
+		//change position
+	}
+}
+
+void aim_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
+	Mat frame;
+	float kaugus;
+	Point2f mc;
+
+	stop_dribbler(serial);
+
+	while (true){
+		tie(frame, mc, kaugus) = get_frame_ball(cap, ball);
+		if (mc.x == -1){
+			break;
+		}
+		if (kaugus > 100){//kaugel
+			if (mc.x < 255){
+				turn(30, true, serial);
+			}
+			else if (mc.x > 385){
+				turn(30, false, serial);
+			}
+			else{
+				break;
+			}
+		}
+		else{//lähedal
+			if (mc.x < 255){
+				turn(30, true, serial);
+			}
+			else if (mc.x > 385){
+				turn(30, false, serial);
+			}
+			else{
+				break;
+			}
+		}
+		
+	}
+}
+
+void find_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
+	stop_dribbler(serial);
+
+	Mat frame;
+	Point2f mc;
+	float kaugus;
+
+	while (mc.x == -1){
+		for (int i = 0; i < 6; i++){//max 6 times
+			tie(frame, mc, kaugus) = get_frame_ball(cap, ball);
+			if (mc.x != -1){
+				break;
+			}
+			else{
+				turn16(true, serial);//vasakule
+			}
+		}
+		//change position
 	}
 }
 
@@ -403,7 +502,7 @@ tuple<Mat, Point2f> get_frame_goal(VideoCapture cap, vector<int> goal){
 }
 
 //check if ball in view
-tuple<Mat, Point2f> get_frame_ball(VideoCapture cap, vector<int> ball){
+tuple<Mat, Point2f, float> get_frame_ball(VideoCapture cap, vector<int> ball){
 	Mat frame, ball_thresh;
 	cap >> frame;
 	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
@@ -414,7 +513,7 @@ tuple<Mat, Point2f> get_frame_ball(VideoCapture cap, vector<int> ball){
 	Point2f mc_ball;
 	float kaugus;
 	tie(mc_ball, kaugus) = process_ball(contours_ball, frame);
-	return make_tuple(frame, mc_ball);
+	return make_tuple(frame, mc_ball, kaugus);
 }
 
 int main() {
@@ -481,8 +580,13 @@ int main() {
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
 		for (;;) {
+			Point2f corner1;
+			float kaugus;
+			Mat frame;
+			tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
+			cout << kaugus << endl;
 			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
-			//imshow("calibrate", frame);
+			imshow("calibrate", frame);
 			waitKey(10);
 		}
 	}
@@ -520,15 +624,17 @@ int main() {
 		bool tribler = false;
 
 		for (;;) {
-
-			while (true){
+			/*
+			while (stopbool ==true){
 				Mat frame;
 				Point2f corner1, corner2;
-				tie(frame, corner1, corner2) = get_frame_line(cap);
+				float kaugus;
+				tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
+				cout << kaugus << endl;
 				imshow("test", frame);
 				waitKey(10);
 			}
-
+			*/
 			if (respond == true){
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
 				respond = false;
