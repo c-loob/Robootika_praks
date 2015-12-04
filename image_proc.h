@@ -9,4 +9,4 @@ using namespace std;
 float eucl_dist(Point2f corner1, Point2f corner2);
 Mat preprocess(Mat frame, int lowH, int lowS, int lowV, int highH, int highS, int highV);
 tuple<Point2f, Point2f, Point2f> process_goal(vector<vector<Point>> contours, Mat frame, Scalar varv);
-pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Point2f a, Point2f b);
+tuple<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame);

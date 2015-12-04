@@ -113,7 +113,7 @@ tuple<Point2f, Point2f, Point2f> process_goal(vector<vector<Point>> contours, Ma
 }
 
 //väljastab ainult kõige suurema kontuuri, raadiuse
-pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Point2f a, Point2f b) {
+tuple<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 
 	vector<Moments> mu(contours.size());
 	for (int i = 0; i < contours.size(); i++)
@@ -170,22 +170,23 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Poi
 				}
 				*/
 				//if (a.x != -1){
+				/*
 				if (((((mc[i].x - a.x)*(b.y - a.y) - (mc[i].y - a.y)*(b.x - a.x))*((320 - a.x)*(b.y - a.y) - (480 - a.y)*(b.x - a.x))) < 0)
-					&& ((((a.x - mc[i].x)*(480 - mc[i].y) - (a.y - mc[i].y)*(320 - mc[i].x))*((b.x - mc[i].x)*(480 - mc[i].y) - (b.y - mc[i].y)*(320 - mc[i].x))) < 0)){
-					//cout << "found ball" << endl;
-					float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
+				&& ((((a.x - mc[i].x)*(480 - mc[i].y) - (a.y - mc[i].y)*(320 - mc[i].x))*((b.x - mc[i].x)*(480 - mc[i].y) - (b.y - mc[i].y)*(320 - mc[i].x))) < 0)){
+				//cout << "found ball" << endl;
+				float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
 
-					biggest_contour_area = ctArea;
-					biggest_contour_id = i;
+				biggest_contour_area = ctArea;
+				biggest_contour_id = i;
 				}
 
 				else{
-					float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
+				float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
 
-					biggest_contour_area = ctArea;
-					biggest_contour_id = i;
-					//}
-				}
+				biggest_contour_area = ctArea;
+				biggest_contour_id = i;
+				//}
+				}*/
 				/*
 				else if (((((mc[i].x - a.x)*(b.y - a.y) - (mc[i].y - a.y)*(b.x - a.x))*((320 - a.x)*(b.y - a.y) - (480 - a.y)*(b.x - a.x))) > 0)
 				&& ((((a.x - mc[i].x)*(480 - mc[i].y) - (a.y - mc[i].y)*(320 - mc[i].x))*((b.x - mc[i].x)*(480 - mc[i].y) - (b.y - mc[i].y)*(320 - mc[i].x))) > 0)){
@@ -208,7 +209,7 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Poi
 			mc[biggest_contour_id].x = -1;
 			mc[biggest_contour_id].y = -1;
 		}
-		return make_pair(mc[biggest_contour_id], r);
+		return make_tuple(mc[biggest_contour_id], r);
 	}
 	else {
 		//kui ühtegi palli ei leita, siis tagastatakse koordinaadid (-1, -1)
@@ -216,6 +217,6 @@ pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Poi
 		temp.x = -1;
 		temp.y = -1;
 		float temp2 = 0;
-		return make_pair(temp, temp2);
+		return make_tuple(temp, temp2);
 	}
 }

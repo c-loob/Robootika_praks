@@ -365,7 +365,7 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 		}
 	}
 }
-
+/*
 tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, vector<int> ball, vector<int> yellow, vector<int> blue, int state){
 	if (state == 1){//competition mode
 		Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
@@ -478,7 +478,36 @@ tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, vector<int> ball
 	}
 	
 }
+*/
+//check if goal in view
+tuple<Mat, Point2f> get_frame_goal(VideoCapture cap, vector<int> goal){
+	Mat frame, goal_thresh;
+	cap >> frame;
+	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
+	goal_thresh = preprocess(frame, goal[0], goal[1], goal[2], goal[3], goal[4], goal[5]);
+	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+	Point2f mc_goal, corner0, corner1;
+
+	tie(mc_goal, corner0, corner1) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+	return make_tuple(frame, mc_goal);
+}
+
+//check if ball in view
+tuple<Mat, Point2f> get_frame_ball(VideoCapture cap, vector<int> ball){
+	Mat frame, ball_thresh;
+	cap >> frame;
+	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
+
+	ball_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
+	findContours(ball_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+	Point2f mc_ball;
+	float kaugus;
+	tie(mc_ball, kaugus) = process_ball(contours_ball, frame);
+	return make_tuple(frame, mc_ball);
+}
 
 int main() {
 	int state = 0;//select state 0-calib color, no serial; 1- competition mode, no trackbars
@@ -488,7 +517,7 @@ int main() {
 	int speed = 150;
 
 	ifstream calib_param;
-	calib_param.open("C:\\Users\\Dell\\Documents\\Visual Studio 2013\\Projects\\Sarvik\\Sarvik\\calib_param.txt");
+	calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
 	
 	std::vector<int> ball_calib;
@@ -544,8 +573,8 @@ int main() {
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
 		for (;;) {
-			tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
-			imshow("calibrate", frame);
+			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
+			//imshow("calibrate", frame);
 			waitKey(10);
 		}
 	}
@@ -583,52 +612,68 @@ int main() {
 		bool tribler = false;
 
 		for (;;) {
+
 			while (stopbool == true){
-				String data = serialr.readLine();
-				cout << data << endl;
-				cout << data[1] << endl;
-				cout << data[2] << endl;
-				if ((data[1] == 'A') || (data[1] == 'X')){
-					if ((data[2] == 'A') || (data[2] == 'X')){
-						if (data.find("START") > 0){
-							cout << "tere" << endl;
-							stopbool = false;
-							break;
-						}
-						if (data.find("STOP") > 0){
-							stopbool = true;
-						}
-					}
-				}
+				Mat frame;
+				Point2f wat;
+				//tie(frame, wat) = get_frame(cap);
+				//imshow("line", frame);
+				waitKey(10);
 			}
 
-
-			set_dribbler(0, serial);
 			if (respond == true){
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
 				respond = false;
 			}
 
-			tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
-			if ((kaugus < 100) && (tribler == false) && (kaugus >0)){
-				//set_dribbler(255, serial);
-			}
-			if (((kaugus > 100) && (tribler == true)) || (kaugus == -1) && (bl == false)){
-				//set_dribbler(0, serial);
-			}
 			serial.send("bl\r\n");
-			sleepcp(10);
-			if (bl == true){
-				ball_in(mc_goal, serial);
-				//set_dribbler(200, serial);
-				if (tribler == false){
 
-					tribler = true;
+			if (bl == true){
+				if (mc_goal.x == -1){
+					//search goal
+					/*
+					turn max 6 times(360deg), if no goal found move on
+					*/
+					int countTurn = 0;
+					while (countTurn < 6){
+						//float *liigu = turn16();
+						//get frame
+						//check if goal now in view, if yes, break
+						//if no ball in dribbler, break
+					}
+					/*
+					check if line in the way
+					move to better position
+					*/
+
+				}
+				else{
+					//handle shooting
+					/*
+					if shot clear shoot,
+					else wait once for 2 sec, if no clear shot, move to better position
+					*/
 				}
 			}
 			else {
-				no_ball(mc_ball, kaugus, serial);
+				if (mc_ball.x == -1){
+					//search ball
+					/*
+					turn max 6 times(360deg), if no ball found move on
+					*/
+
+					//float *liigu = turn16();
+				}
+				else{
+					//handle catching
+					/*
+					turn to ball
+					if path clear, move to ball
+					else find better position
+					*/
+				}
 			}
+
 			imshow("orig", frame);
 			waitKey(10);
 		}
