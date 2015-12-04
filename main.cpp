@@ -707,7 +707,6 @@ int main() {
 				}
 			}
 			else {
-				cout << "hia" << endl;
 				Point2f b;
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
@@ -743,6 +742,7 @@ int main() {
 					if path clear, move to ball
 					else find better position
 					*/
+					cout << kaugus << endl;
 				}
 			}
 

@@ -133,7 +133,7 @@ tuple<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 		for (int i = 0; i < contours.size(); i++) {
 			if (contourArea(contours[i])>100) {
 				//drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
-				circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
+				//circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
 				float radius(contours[i].size());
 			}
 		}
@@ -143,7 +143,9 @@ tuple<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame) {
 		for (int i = 0; i < contours.size(); i++) {
 			//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
 			float ctArea = contourArea(contours[i]);
-			if (ctArea > biggest_contour_area) { //if below line
+			if (ctArea > biggest_contour_area) { 
+				biggest_contour_area = ctArea;
+				biggest_contour_id = i;
 				//circle(frame, Point(320, 480), 4, Scalar(0, 0, 0), 1, 8, 0);
 				/*
 				Mat temp, temp2, temp3 = Mat::zeros(frame.size(), CV_8UC3);
