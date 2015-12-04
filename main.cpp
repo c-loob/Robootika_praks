@@ -1,16 +1,3 @@
-/*
-NB!
-liikumine toimub vektori abil kus:
-esimene element tähistab liikumist y teljel(otse)
-teine liikumist x teljel(külgedele).
-kolmas roteerumist(positiivne = vastupäeva või vasakule, negatiivne = päripäeva või paremale)
-liigutamiseks tuleb defineerida:
-float liigu[3] = { 0, 0, 1 };
-int max_speed = ?;
-ning liikumise saab esile kutsuda:
-movement(liigu, max_speed);
-*/
-
 #include <opencv2\opencv.hpp>
 #include <opencv2\highgui.hpp>
 #include <opencv2\imgproc.hpp>
@@ -18,23 +5,91 @@ movement(liigu, max_speed);
 #include <vector>
 #include <opencv\cv.h>
 #include <stdio.h>
-#include <time.h>//sleepcp - windows/posix sys-s? possible future error
+#include <time.h>
 #include <string>
 #include <iostream>
 #include <boost\asio.hpp>
 #include <boost\thread.hpp>
+#include <mutex>
+#include <image_proc.h>
+#include <control_r.h>
+#include <fstream>
 
 using namespace cv;
 using namespace std;
 
+//global stuff
+vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black, contours_white;
+vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black, hierarchy_white;
+
+bool dribbler;
+bool suund;
+mutex mu;
 bool refstart = false;
 bool stopbool = true;
 bool bl = false;
 String my_robotID = "A";
 String my_field = "A";
-//String goal = "yellow";
-String goal = "blue";
+bool goal_select = true; //true = yellow, false = blue
 bool respond = false;
+
+class SimpleSerial
+{
+public:
+	/**
+	* Constructor.
+	* \param port device name, example "/dev/ttyUSB0" or "COM4"
+	* \param baud_rate communication speed, example 9600 or 115200
+	* \throws boost::system::system_error if cannot open the
+	* serial device
+	*/
+	SimpleSerial(std::string port, unsigned int baud_rate)
+		: io(), serial(io, port)
+	{
+		serial.set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
+	}
+
+	/**
+	* Write a string to the serial device.
+	* \param s string to write
+	* \throws boost::system::system_error on failure
+	*/
+	void writeString(std::string s)
+	{
+		boost::asio::write(serial, boost::asio::buffer(s.c_str(), s.size()));
+	}
+
+	/**
+	* Blocks until a line is received from the serial device.
+	* Eventual '\n' or '\r\n' characters at the end of the string are removed.
+	* \return a string containing the received line
+	* \throws boost::system::system_error on failure
+	*/
+	std::string readLine()
+	{
+		//Reading data char by char, code is optimized for simplicity, not speed
+		using namespace boost;
+		char c;
+		std::string result;
+		for (;;)
+		{
+			asio::read(serial, asio::buffer(&c, 1));
+			switch (c)
+			{
+			case '\r':
+				break;
+			case '\n':
+				return result;
+			default:
+				result += c;
+			}
+		}
+	}
+
+private:
+	boost::asio::io_service io;
+	boost::asio::serial_port serial;
+};
 
 class SerialClass{
 public:
@@ -48,8 +103,9 @@ public:
 		io.stop();
 		
 		//Wait for the thread to finish
-		//runner.join();
-		runner.detach();
+		runner.join();
+		
+	
 	}
 
 	bool connect(const std::string& port_name, int baud = 19200)
@@ -73,16 +129,6 @@ public:
 
 			startReceive();
 		}
-		else if ((port.is_open()) && (port_name.compare("COM3"))){
-			runner = boost::thread(
-				boost::bind(
-				&boost::asio::io_service::run,
-				&io));
-
-			listenReferee();
-		}
-		
-
 		return port.is_open();
 	}
 
@@ -96,19 +142,11 @@ public:
 			"\n",
 			boost::bind(&SerialClass::onData,
 			this, _1, _2));
+		async_read_until(port, buffer,
+			"-",
+			boost::bind(&SerialClass::onData,
+			this, _1, _2));
 	}
-
-
-	void listenReferee()
-	{
-		using namespace boost::asio;
-		//Issue a async receive and give it a callback
-		//onData that should be called when "\r\n"
-		//is matched.
-		//async_read_until(port, buffer,"-",boost::bind(&SerialClass::onData,this, _1, _2));
-		async_read_until(port, buffer, "\r", boost::bind(&SerialClass::onData, this, _1, _2));
-	}
-
 
 	void send(const std::string& text)
 	{
@@ -130,7 +168,7 @@ public:
 			//std::istream is2(&buffer);
 			std::string data(size, '\0');
 			is.read(&data[0], size);
-			
+			std::cout << data << endl;
 			if (((data.length()>6) && (data.compare("<4:bl:0>\n")==0)) || ((data.length()>6)&&(data.compare("<4:bl:1>\n")==0))){
 				
 				char bl_det = data[6];
@@ -144,30 +182,45 @@ public:
 				}
 			}
 			else{
-			cout << data << endl;
+			std::cout << data << endl;
 			//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
-			if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
-				if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
+			//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
+				/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
 					if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
 						if (data[2] == my_robotID[0]){
 							respond = true;
-						}
-						if (data[5] == 'O'){//command is START
-							cout << "stopping..." << endl;
+						}*/
+			if ((data.find("AX") != std::string::npos) || (data.find("AA") != std::string::npos) || (data.find("XX") != std::string::npos)){
+						if (data.find("STOP") != std::string::npos){//command is STOP
+							std::cout << "stopping..1." << endl;
 							refstart = false;
 							stopbool = true;
 						}
-						else{//command is STOP
+						else{//command is START
 						
 							refstart = true;
-							cout << "starting...." << endl;
+							std::cout << "starting.1..." << endl;
 							stopbool = false;
 						}
-					}
-				}
 			}
+			if (data.find("STOP") != std::string::npos){//command is STOP
+				std::cout << "stopping..." << endl;
+				refstart = false;
+				stopbool = true;
+				std::cout << "stop" << endl;
 			}
-			cout << data << endl;
+			else if (data.find("STAR") != std::string::npos){//command is START
+
+				refstart = true;
+				std::cout << "starting...." << endl;
+				stopbool = false;
+				std::cout << "start" << endl;
+			}
+					//}
+				//}
+			//}
+			}
+			std::cout << data << endl;
 			//If we receive quit()\r\n indicate
 			//end of operations
 			quitFlag = (data.compare("quit()\r\n") == 0);
@@ -184,62 +237,17 @@ private:
 	boost::asio::serial_port port;
 
 	boost::thread runner;
-	//boost::thread runner2;
+	boost::thread runner2;
 	boost::asio::streambuf buffer;
 	//boost::asio::streambuf buffer2;
 	bool quitFlag;
 };
 
-//global stuff
-vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black, contours_white;
-vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black, hierarchy_white;
-
-bool dribbler;
-bool suund;
-
-//sihtimise limiidid
-int vasak_limiit = 245;
-int parem_limiit = 395;
-
-int vasak_limiitG = 200;
-int parem_limiitG = 440;
-
-//initial values for trackbars
-int G_lowH2 = 90;
-int G_highH2 = 108;
-int G_lowS2 = 160;
-int G_highS2 = 255;
-int G_lowV2 = 70;
-int G_highV2 = 221;
-
-//Yellow goal
-int G_lowH1 = 15;
-int G_highH1 = 40;
-int G_lowS1 = 100;
-int G_highS1 = 2255;
-int G_lowV1 = 70;
-int G_highV1 = 255;
-
-//blue goal
-int B_lowH = 5;
-int B_highH = 25;
-int B_lowS = 80;
-int B_highS = 255;
-int B_lowV = 50;
-int B_highV = 255;
-
 //headers
-void sleepcp(int milliseconds);
-void move_robot(int * kiirus);
-
+void move_robot(int * kiirus, SerialClass& serial);
 void movement(float liigu[3], int max_speed, SerialClass& serial);
-int ymarda(float a);
-int * get_speed(float * joud);
-float * move_vector(float liigu[3]);
-int ymarda(float a);
 void stop(bool stop, SerialClass& serial);
 String receive(String port, int length);
-
 void set_dribbler(int speed, SerialClass& serial);
 void stop_dribbler(SerialClass& serial);
 void charge(SerialClass& serial);
@@ -248,275 +256,8 @@ void kick(SerialClass& serial);
 void move_robot(int * kiirus, SerialClass& serial);
 void ball_in(Point2f mc_goal, SerialClass& serial);
 void no_ball(Point2f mc_ball, SerialClass& serial);
-float eucl_dist(Point2f corner1, Point2f corner2);
 
-void sleepcp(int milliseconds) // cross-platform sleep function
-{
-	clock_t time_end;
-	time_end = clock() + milliseconds * CLOCKS_PER_SEC / 1000;
-	while (clock() < time_end)
-	{
-	}
-}
 
-//get thersholded, eroded etc img
-Mat preprocess(Mat frame, int lowH, int lowS, int lowV, int highH, int highS, int highV) {
-	Mat thresh, HSV;
-	cvtColor(frame, HSV, COLOR_BGR2HSV);//to HSV color space
-	inRange(HSV, Scalar(lowH, lowS, lowV), Scalar(highH, highS, highV), thresh);
-
-	erode(thresh, thresh, Mat(), Point(-1, -1), 2);
-	dilate(thresh, thresh, Mat(), Point(-1, -1), 2);
-	return thresh;
-}
-
-//get mass center of goal(mc of biggest contour)
-tuple<Point2f, Point2f, Point2f> process_goal(vector<vector<Point>> contours, Mat frame, Scalar varv) {
-	float biggest_contour_area = 0;
-	int biggest_contour_id = -1;
-	vector<Point2f> mc_goal(contours.size());
-	for (int i = 0; i < contours.size(); i++) {
-		//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
-		float ctArea = contourArea(contours[i]);
-		if ((ctArea > biggest_contour_area)&&(ctArea>500)) {
-			biggest_contour_area = ctArea;
-			biggest_contour_id = i;
-		}
-	}
-
-	if ((biggest_contour_id < 0)) {
-		Point2f temp, temp2, temp3;
-		temp.x = -1;
-		temp.y = -1;
-		temp2.x = -1;
-		temp2.y = -1;
-		temp3.x = -1;
-		temp3.y = -1;
-		return make_tuple(temp, temp2,temp3);;//väravat ei leitud
-	}
-	else {
-		vector<Moments> mu_goal(contours.size());
-		mu_goal[biggest_contour_id] = moments(contours[biggest_contour_id], false);
-
-		mc_goal[biggest_contour_id] = Point2f(mu_goal[biggest_contour_id].m10 / mu_goal
-
-			[biggest_contour_id].m00, mu_goal[biggest_contour_id].m01 / mu_goal[biggest_contour_id].m00);
-
-		circle(frame, mc_goal[biggest_contour_id], 4, Scalar(255, 0, 0), -1, 8, 0);
-
-		RotatedRect boundingBox = minAreaRect(contours[biggest_contour_id]);
-		Point2f corners[4];
-		corners[0].x = -1;
-		corners[0].y = 1;
-		corners[1].x = -1;
-		corners[1].y = 1;
-		corners[2].x = -1;
-		corners[2].y = 1;
-		corners[3].x = -1;
-		corners[3].y = 1;
-		boundingBox.points(corners);
-
-		float longest = -1;
-		int longest_id = -1;
-		if (eucl_dist(corners[0], corners[1]) > longest){
-			longest_id = 0;
-			longest = eucl_dist(corners[0], corners[1]);
-		}
-		if (eucl_dist(corners[1], corners[2]) > longest){
-			longest_id = 1;
-			longest = eucl_dist(corners[1], corners[2]);
-		}
-		if (eucl_dist(corners[2], corners[3]) > longest){
-			longest_id = 2;
-			longest = eucl_dist(corners[2], corners[3]);
-		}
-		if (eucl_dist(corners[3], corners[0]) > longest){
-			longest_id = 3;
-			longest = eucl_dist(corners[3], corners[0]);
-		}
-		line(frame, corners[0], corners[1], Scalar(255, 0, 0));
-		line(frame, corners[1], corners[2], Scalar(255, 0, 0));
-		line(frame, corners[2], corners[3], Scalar(255, 0, 0));
-		line(frame, corners[3], corners[0], Scalar(255, 0, 0));
-
-		if (longest_id == 0){
-			line(frame, corners[0], corners[1], Scalar(0, 0, 255));
-			return make_tuple(mc_goal[biggest_contour_id], corners[0], corners[1]);
-		}
-		else if (longest_id == 1){
-			line(frame, corners[1], corners[2], Scalar(0, 0, 255));
-			return make_tuple(mc_goal[biggest_contour_id], corners[1], corners[2]);
-		}
-		else if (longest_id == 2){
-			line(frame, corners[2], corners[3], Scalar(0, 0, 255));
-			return make_tuple(mc_goal[biggest_contour_id], corners[2], corners[3]);
-		}
-		else if (longest_id == 3){
-			line(frame, corners[3], corners[0], Scalar(0, 0, 255));
-			return make_tuple(mc_goal[biggest_contour_id], corners[3], corners[0]);
-		}
-
-		//return mc_goal[biggest_contour_id];
-	}
-}
-
-float eucl_dist(Point2f corner1, Point2f corner2){
-	return (sqrt((corner1.x - corner2.x)*(corner1.x - corner2.x) + (corner1.y - corner2.y)*(corner1.y - corner2.y)));
-}
-
-//väljastab ainult kõige suurema kontuuri, raadiuse
-pair<Point2f, float> process_ball(vector<vector<Point>> contours, Mat frame, Point2f a, Point2f b) {
-
-	vector<Moments> mu(contours.size());
-	for (int i = 0; i < contours.size(); i++)
-	{
-		mu[i] = moments(contours[i], false);
-	}
-	//get mass centers
-	vector<Point2f> mc(contours.size());
-	if (contours.size() > 0) {
-		for (int i = 0; i < contours.size(); i++)
-		{
-			mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
-		}
-
-		Mat imgDrawing = Mat::zeros(frame.size(), CV_8UC3);
-
-		for (int i = 0; i < contours.size(); i++) {
-			if (contourArea(contours[i])>100) {
-				//drawContours(frame, contours_ball, i, Scalar(0, 0, 255), 2, 8, hierarchy_ball, 0, Point());
-				//circle(frame, mc[i], 4, Scalar(255, 0, 0), -1, 8, 0);
-				float radius(contours[i].size());
-			}
-		}
-		float biggest_contour_area = 0;
-		int biggest_contour_id = 0;
-
-		for (int i = 0; i < contours.size(); i++) {
-			//drawContours(imgDrawing2, contours, i, Scalar(255, 0, 0), 1, 8, hierarchy_goal, 0, Point());
-			float ctArea = contourArea(contours[i]);
-			if (ctArea > biggest_contour_area) { //if below line
-				circle(frame, Point(320, 480), 4, Scalar(0, 0, 0), 1, 8, 0);
-				/*
-				Mat temp, temp2, temp3 = Mat::zeros(frame.size(), CV_8UC3);
-				line(temp, a, b, Scalar(255, 255, 255), 4, 8, 0);
-				line(temp2, Point(320, 480), mc[i], Scalar(255, 255, 255), 4, 8, 0);
-				bitwise_and(temp, temp2, temp3);
-				double min, max;
-				int countw = 0;
-				for (int y = 0; y < temp3.rows; y++){
-				for (int x = 0; x < temp3.cols; x++){
-				if (temp3.at<cv::Vec3b>(y, x) == cv::Vec3b(0, 0, 0)){
-				countw += 1;
-				}
-
-				}
-				}
-				if (countw > 0){
-				cout << "found ball" << endl;
-				float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
-
-				biggest_contour_area = ctArea;
-				biggest_contour_id = i;
-				}
-				}
-				*/
-				//if (a.x != -1){
-				if (((((mc[i].x - a.x)*(b.y - a.y) - (mc[i].y - a.y)*(b.x - a.x))*((320 - a.x)*(b.y - a.y) - (480 - a.y)*(b.x - a.x))) < 0)
-					&& ((((a.x - mc[i].x)*(480 - mc[i].y) - (a.y - mc[i].y)*(320 - mc[i].x))*((b.x - mc[i].x)*(480 - mc[i].y) - (b.y - mc[i].y)*(320 - mc[i].x))) < 0)){
-					//cout << "found ball" << endl;
-					float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
-
-					biggest_contour_area = ctArea;
-					biggest_contour_id = i;
-				}
-				
-				else{
-					float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
-
-					biggest_contour_area = ctArea;
-					biggest_contour_id = i;
-				//}
-				}
-				/*
-				else if (((((mc[i].x - a.x)*(b.y - a.y) - (mc[i].y - a.y)*(b.x - a.x))*((320 - a.x)*(b.y - a.y) - (480 - a.y)*(b.x - a.x))) > 0)
-					&& ((((a.x - mc[i].x)*(480 - mc[i].y) - (a.y - mc[i].y)*(320 - mc[i].x))*((b.x - mc[i].x)*(480 - mc[i].y) - (b.y - mc[i].y)*(320 - mc[i].x))) > 0)){
-					cout << "found ball" << endl;
-					float ball_dist = sqrt((mc[i].x - 320)*(mc[i].x - 320) + (mc[i].y - 480)*(mc[i].y - 480));
-
-					biggest_contour_area = ctArea;
-					biggest_contour_id = i;
-				}*/
-			}
-			
-			}
-		
-		float r = sqrt(biggest_contour_area / 3.1415);
-		//cout << "r= " << biggest_contour_area;
-		if (biggest_contour_id != -1){
-			circle(frame, mc[biggest_contour_id], r, Scalar(255, 0, 0), -1, 8, 0);
-		}
-		else{
-			mc[biggest_contour_id].x = -1;
-			mc[biggest_contour_id].y = -1;
-		}
-		return make_pair(mc[biggest_contour_id], r);
-	}
-	else {
-		//kui ühtegi palli ei leita, siis tagastatakse koordinaadid (-1, -1)
-		Point2f temp;
-		temp.x = -1;
-		temp.y = -1;
-		float temp2 = 0;
-		return make_pair(temp, temp2);
-	}
-}
-
-float * move_vector(float liigu[3]){//liigu[3] = liikumise vektor {x, y, w} w-nurkkiirendus, 0 kui ei taha pöörata
-	//liikumise maatriks, et ei peaks iga kord arvutama
-	float liikumine[3][3] = { { 0.57735, -0.33333, 0.33333 }, { -0.57735, -0.33333, 0.33333 }, {
-
-		0, 0.66667, 0.33333 } };
-	float f1, f2, f3, x, y, w;
-	static float tagastus[3];//jõudude vektor mille pärast tagastame
-
-	x = liigu[0];
-	y = liigu[1];
-	w = liigu[2];
-
-	//arvutame iga mootori jõu
-	f1 = liikumine[0][0] * x + liikumine[0][1] * y + liikumine[0][2] * w;
-	f2 = liikumine[1][0] * x + liikumine[1][1] * y + liikumine[1][2] * w;
-	f3 = liikumine[2][0] * x + liikumine[2][1] * y + liikumine[2][2] * w;
-
-	tagastus[0] = f1;
-	tagastus[1] = f2;
-	tagastus[2] = f3;
-
-	return tagastus;
-}
-
-int * get_speed(float * joud, int max_speed){
-	static int tagastus[3];
-
-	tagastus[0] = ymarda(joud[0] * max_speed);
-	tagastus[1] = ymarda(joud[1] * max_speed);
-	tagastus[2] = ymarda(joud[2] * max_speed);
-
-	return tagastus;
-}
-
-int ymarda(float a){
-	if (a > 0){
-		int b = (int)(a + 0.5);
-		return (int)b;
-	}
-	else if (a < 0){
-		int b = (int)(a - 0.5);
-		return (int)b;
-	}
-	else return 0;
-}
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -597,11 +338,7 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 	int hs = 75;
 	int ms = 75;
 	int ls = 50;
-	/*
-	hs = 0;
-	ms = 0;
-	ls = 0;
-	*/
+	
 	if (mc_ball.x == -1){
 		//search for ball
 		float liigu[3] = { 0, -0.3, -0.5 };//paremale
@@ -629,159 +366,250 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 	}
 }
 
-tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, String goal){
-	Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
-	cap >> frame;
-	if (!cap.read(frame)) cout << "error reading frame" << endl;//check for error'
+tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, vector<int> ball, vector<int> yellow, vector<int> blue, int state){
+	if (state == 1){//competition mode
+		Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
+		cap >> frame;
+		if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-	//BALL
-	Point2f mc_ball;//mass centers
+		//BALL
+		Point2f mc_ball;//mass centers
 
-	pall_thresh = preprocess(frame, B_lowH, B_lowS, B_lowV, B_highH, B_highS, B_highV);
+		pall_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
 
-	findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
-	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
-	white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
-	
-	dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
-	bitwise_and(white_thresh, black_thresh, white_result);
+		black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
+		white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
 
-	imshow("test2", white_result);
-	waitKey(10);
+		dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
+		bitwise_and(white_thresh, black_thresh, white_result);
 
-	findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-	Point2f mc_black, mc_white, corner1, corner2;
-	tie(mc_black, corner1, corner2) = process_goal(contours_black, frame, Scalar(0, 0, 0));
-	tie(mc_white, corner1, corner2)= process_goal(contours_white, frame, Scalar(255, 0, 0));
-	
-	pair<Point2f, float> result = process_ball(contours_ball, frame, corner1, corner2);
-	mc_ball = result.first;
-	float raadius = result.second;
+		findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+		Point2f mc_black, mc_white, corner1, corner2;
+		tie(mc_black, corner1, corner2) = process_goal(contours_black, frame, Scalar(0, 0, 0));
+		tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
 
-	//arvutame palli !umbkaudse! kauguse kaamerast
-	//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
-	float palli_kaugus;
-	if (raadius != 0){
-		palli_kaugus = 2.5 * 1060 / (2 * raadius);
+		pair<Point2f, float> result = process_ball(contours_ball, frame, corner1, corner2);
+		mc_ball = result.first;
+		float raadius = result.second;
+
+		//arvutame palli !umbkaudse! kauguse kaamerast
+		//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
+		float palli_kaugus;
+		if (raadius != 0){
+			palli_kaugus = 2.5 * 1060 / (2 * raadius);
+		}
+		else{
+			palli_kaugus = -1;
+		}
+		putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
+			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+
+		//GOAL
+		if (goal_select == true){//yellow
+			goal_thresh = preprocess(frame, yellow[0], yellow[1], yellow[2], yellow[3], yellow[4], yellow[5]);
+
+		}
+		if (goal_select == false){//blue
+			goal_thresh = preprocess(frame, blue[0], blue[1], blue[2], blue[3], blue[4], blue[5]);
+		}
+
+		findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+		Point2f mc_goal, lamp0, lamp1;
+		tie(mc_goal, lamp0, lamp1) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+		return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 	}
 	else{
-		palli_kaugus = -1;
-	}
-	putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
-		FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-	
-	//GOAL
-	if (goal == "yellow"){
-		goal_thresh = preprocess(frame, G_lowH1, G_lowS1, G_lowV1, G_highH1, G_highS1, G_highV1);
+		Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
+		cap >> frame;
+		if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-	}
-	if (goal == "blue"){
-		goal_thresh = preprocess(frame, G_lowH2, G_lowS2, G_lowV2, G_highH2, G_highS2, G_highV2);
+		//BALL
+		Point2f mc_ball;//mass centers
+
+		pall_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
+		imshow("ball", pall_thresh);
+		waitKey(10);
+
+		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+		black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
+		white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
+
+		dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
+		bitwise_and(white_thresh, black_thresh, white_result);
+
+		findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+		Point2f mc_black, mc_white, corner1, corner2;
+		tie(mc_black, corner1, corner2) = process_goal(contours_black, frame, Scalar(0, 0, 0));
+		tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
+
+		pair<Point2f, float> result = process_ball(contours_ball, frame, corner1, corner2);
+		mc_ball = result.first;
+		float raadius = result.second;
+
+		//arvutame palli !umbkaudse! kauguse kaamerast
+		//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
+		float palli_kaugus;
+		if (raadius != 0){
+			palli_kaugus = 2.5 * 1060 / (2 * raadius);
+		}
+		else{
+			palli_kaugus = -1;
+		}
+		putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
+			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
+
+	
+		goal_thresh = preprocess(frame, yellow[0], yellow[1], yellow[2], yellow[3], yellow[4], yellow[5]);
+		imshow("yellow", goal_thresh);
+		waitKey(10);
+		goal_thresh = preprocess(frame, blue[0], blue[1], blue[2], blue[3], blue[4], blue[5]);
+		imshow("blue", goal_thresh);
+		waitKey(10);
+
+		findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+		Point2f mc_goal, lamp0, lamp1;
+		tie(mc_goal, lamp0, lamp1) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
+		return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 	}
 	
-	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-	
-	Point2f mc_goal, lamp0, lamp1;
-	tie(mc_goal, lamp0, lamp1 ) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-	return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
 }
 
 
-
 int main() {
+	int state = 0;//select state 0-calib color, no serial; 1- competition mode, no trackbars
 	Mat frame;
 	Point2f mc_ball, mc_goal;
 	float kaugus;
 	int speed = 150;
 
-	//trackbar creation
-	namedWindow("control_goal1", WINDOW_AUTOSIZE);//trackbaride aken
-	namedWindow("control_goal2", WINDOW_AUTOSIZE);//trackbaride aken
-
-	createTrackbar("LowH", "control_goal1", &G_lowH1, 179);//hue
-	createTrackbar("HighH", "control_goal1", &G_highH1, 179);
-	createTrackbar("LowS", "control_goal1", &G_lowS1, 255);//saturation
-	createTrackbar("HighS", "control_goal1", &G_highS1, 255);
-	createTrackbar("LowV", "control_goal1", &G_lowV1, 255);//value
-	createTrackbar("HighV", "control_goal1", &G_highV1, 255);
-
-	createTrackbar("LowH", "control_goal2", &G_lowH2, 179);//hue
-	createTrackbar("HighH", "control_goal2", &G_highH2, 179);
-	createTrackbar("LowS", "control_goal2", &G_lowS2, 255);//saturation
-	createTrackbar("HighS", "control_goal2", &G_highS2, 255);
-	createTrackbar("LowV", "control_goal2", &G_lowV2, 255);//value
-	createTrackbar("HighV", "control_goal2", &G_highV2, 255);
-
-	//connect to serial ports
-	SerialClass serial;//control motors etc
+	ifstream calib_param;
+	calib_param.open("C:\\Users\\Dell\\Documents\\Visual Studio 2013\\Projects\\Sarvik\\Sarvik\\calib_param.txt");
+	char output[10];
 	
-	if (serial.connect("COM3", 19200))
-	{
-		std::cout << "Port COM3 is open." << std::endl;
-	}
-	else
-	{
-		std::cout << "Port open failed." << std::endl;
-	}
-	
-	SerialClass serialref;//referee
-
-	if (serialref.connect("COM4", 19200))
-	{
-		std::cout << "Port COM4 is open." << std::endl;
-	}
-	else
-	{
-		std::cout << "Port open failed." << std::endl;
-	}
-	
-	VideoCapture cap(0);//enter cam # or video location-------------------
-	if (!cap.isOpened()) return -1; //check if succeeded
-
-	cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-	serialref.send("+++");
-
-	//serial.send("c\r\n");
-	//serial.send("dm255\r\n");
-	
-	serial.send("c\r\n");
-	//cout << "Referee test..." << endl;
-	//serialref.send("+++");
-	cout << "My robot ID: " << my_robotID[0] << endl;
-	cout << "My field ID: " << my_field[0] << endl;
-	cout << "My goal: " << goal << endl;
-	//stopbool = false;
-	bool tribler = false;
-	for (;;) {
-		
-		if (stopbool == true){
-			//cout << "stop" << endl;
-			//stop(stopbool, serial);
-			/*
-			if (serialref.connect("COM4", 19200))
-			{
-				std::cout << "Port COM4 is open." << std::endl;
-				serialref.send("+++");
+	std::vector<int> ball_calib;
+	std::vector<int> yellow_calib;
+	std::vector<int> blue_calib;
+	if (calib_param.is_open()){
+		for (int i = 0; i < 3; i++){//3 sets of calib
+			for (int j = 0; j < 6; j++){//6 per set
+				calib_param >> output;
+				if (i == 0){
+					ball_calib.push_back(stoi(output));
+				}
+				else if (i == 1){
+					yellow_calib.push_back(stoi(output));
+				}
+				else if (i == 2){
+					blue_calib.push_back(stoi(output));
+				}
 			}
-			else
-			{
-				std::cout << "Port open failed." << std::endl;
-			}
-			*/
-			
+		}
+	}
+
+	if (state == 0){
+		//trackbar creation
+		namedWindow("yellow", WINDOW_AUTOSIZE);//trackbaride aken
+		namedWindow("blue", WINDOW_AUTOSIZE);//trackbaride aken
+		namedWindow("ball", WINDOW_AUTOSIZE);//trackbaride aken
+
+		createTrackbar("LowH", "yellow", &yellow_calib[0], 179);//hue
+		createTrackbar("HighH", "yellow", &yellow_calib[1], 179);
+		createTrackbar("LowS", "yellow", &yellow_calib[2], 255);//saturation
+		createTrackbar("HighS", "yellow", &yellow_calib[3], 255);
+		createTrackbar("LowV", "yellow", &yellow_calib[4], 255);//value
+		createTrackbar("HighV", "yellow", &yellow_calib[5], 255);
+
+		createTrackbar("LowH", "blue", &blue_calib[0], 179);//hue
+		createTrackbar("HighH", "blue", &blue_calib[1], 179);
+		createTrackbar("LowS", "blue", &blue_calib[2], 255);//saturation
+		createTrackbar("HighS", "blue", &blue_calib[3], 255);
+		createTrackbar("LowV", "blue", &blue_calib[4], 255);//value
+		createTrackbar("HighV", "blue", &blue_calib[5], 255);
+
+		createTrackbar("LowH", "ball", &ball_calib[0], 179);//hue
+		createTrackbar("HighH", "ball", &ball_calib[1], 179);
+		createTrackbar("LowS", "ball", &ball_calib[2], 255);//saturation
+		createTrackbar("HighS", "ball", &ball_calib[3], 255);
+		createTrackbar("LowV", "ball", &ball_calib[4], 255);//value
+		createTrackbar("HighV", "ball", &ball_calib[5], 255);
+
+		VideoCapture cap(0);
+		if (!cap.isOpened()) return -1;
+		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+
+		for (;;) {
+			tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
+			imshow("calibrate", frame);
+			waitKey(10);
+		}
+	}
+	else if (state ==1){
+		//connect to serial ports
+		SerialClass serial;//control motors etc
+
+		if (serial.connect("COM3", 19200))
+		{
+			std::cout << "Port COM3 is open." << std::endl;
+		}
+		else
+		{
+			std::cout << "Port open failed." << std::endl;
+		}
+
+		SimpleSerial serialr("COM4", 19200);
+
+
+		VideoCapture cap(0);
+		if (!cap.isOpened()) return -1;
+		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+
+
+		cout << "My robot ID: " << my_robotID[0] << endl;
+		cout << "My field ID: " << my_field[0] << endl;
+		if (goal_select == true){
+			cout << "My goal: " << "yellow" << endl;
 		}
 		else{
-			//cout << "start" << endl;
+			cout << "My goal: " << "blue" << endl;
+		}
+		cout << "waiting for start command..." << endl;
+		bool tribler = false;
+
+		for (;;) {
+			while (stopbool == true){
+				String data = serialr.readLine();
+				cout << data << endl;
+				cout << data[1] << endl;
+				cout << data[2] << endl;
+				if ((data[1] == 'A') || (data[1] == 'X')){
+					if ((data[2] == 'A') || (data[2] == 'X')){
+						if (data.find("START") > 0){
+							cout << "tere" << endl;
+							stopbool = false;
+							break;
+						}
+						if (data.find("STOP") > 0){
+							stopbool = true;
+						}
+					}
+				}
+			}
+
+
 			set_dribbler(0, serial);
 			if (respond == true){
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
-				//serialref.send(temp);
 				respond = false;
 			}
 
-			tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, goal);
+			tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
 			if ((kaugus < 100) && (tribler == false) && (kaugus >0)){
 				//set_dribbler(255, serial);
 			}
@@ -794,7 +622,7 @@ int main() {
 				ball_in(mc_goal, serial);
 				//set_dribbler(200, serial);
 				if (tribler == false){
-					
+
 					tribler = true;
 				}
 			}
@@ -806,7 +634,5 @@ int main() {
 		}
 	}
 
-
-	//destroyAllWindows();
 	return 0;
 }
