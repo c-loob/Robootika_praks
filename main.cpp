@@ -14,6 +14,7 @@
 #include <image_proc.h>
 #include <control_r.h>
 #include <fstream>
+#include <math.h>
 
 using namespace cv;
 using namespace std;
@@ -256,8 +257,17 @@ void kick(SerialClass& serial);
 void move_robot(int * kiirus, SerialClass& serial);
 void ball_in(Point2f mc_goal, SerialClass& serial);
 void no_ball(Point2f mc_ball, SerialClass& serial);
-
-
+tuple<Mat, Point2f, float> get_frame_ball(Mat frame, vector<int> ball);
+tuple<Mat, Point2f> get_frame_goal(Mat frame, vector<int> goal);
+tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame);
+int tous(Point2f p1, Point2f p2);
+void change_position_ball(Mat frame);
+void find_ball(Mat frame, vector<int> ball, SerialClass& serial);
+void aim_ball(Mat frame, vector<int> ball, SerialClass& serial);
+void find_goal(Mat frame, vector<int> goal, SerialClass& serial);
+void aim_goal(Mat frame, vector<int> goal, SerialClass& serial);
+void turn16(bool direction, SerialClass& serial);
+void turn(int speed, bool direction, SerialClass& serial);
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -364,11 +374,11 @@ void turn(int speed, bool direction, SerialClass& serial){
 	movement(liigu, speed, serial);
 }
 
-void aim_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
-	Mat frame;
+void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
+	
 	Point2f mc;
 	while (true){
-		get_frame_goal(cap, goal);
+		get_frame_goal(frame, goal);
 
 		if (mc.x == -1){
 			break;
@@ -386,15 +396,14 @@ void aim_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
 	}
 }
 
-void find_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
+void find_goal(Mat frame, vector<int> goal, SerialClass& serial){
 	stop_dribbler(serial);
 
-	Mat frame;
 	Point2f mc;
 
 	while (mc.x == -1){
 		for (int i = 0; i < 6; i++){//max 6 times
-			tie(frame, mc) = get_frame_goal(cap, goal);
+			tie(frame, mc) = get_frame_goal(frame, goal);
 			if (mc.x != -1){
 				break;
 			}
@@ -406,15 +415,15 @@ void find_goal(VideoCapture cap, vector<int> goal, SerialClass& serial){
 	}
 }
 
-void aim_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
-	Mat frame;
+void aim_ball(Mat frame, vector<int> ball, SerialClass& serial){
+	
 	float kaugus;
 	Point2f mc;
 
 	stop_dribbler(serial);
 
 	while (true){
-		tie(frame, mc, kaugus) = get_frame_ball(cap, ball);
+		tie(frame, mc, kaugus) = get_frame_ball(frame, ball);
 		if (mc.x == -1){
 			break;
 		}
@@ -444,16 +453,16 @@ void aim_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
 	}
 }
 
-void find_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
+void find_ball(Mat frame, vector<int> ball, SerialClass& serial){
 	stop_dribbler(serial);
 
-	Mat frame;
+	
 	Point2f mc;
 	float kaugus;
 
 	while (mc.x == -1){
 		for (int i = 0; i < 6; i++){//max 6 times
-			tie(frame, mc, kaugus) = get_frame_ball(cap, ball);
+			tie(frame, mc, kaugus) = get_frame_ball(frame, ball);
 			if (mc.x != -1){
 				break;
 			}
@@ -461,15 +470,33 @@ void find_ball(VideoCapture cap, vector<int> ball, SerialClass& serial){
 				turn16(true, serial);//vasakule
 			}
 		}
+		
 		//change position
 	}
 }
 
-tuple<Mat, Point2f, Point2f> get_frame_line(VideoCapture cap){
+void change_position_ball(Mat frame){
+	Point2f p1, p2;
+	tie(frame, p1, p2) = get_frame_line(frame);
+	if (p1.x != -1){//joon näha
+		int nurk = tous(p1, p2);
+		cout << nurk << endl;
+	}
+}
+
+int tous(Point2f p1, Point2f p2){
+	float param = (p2.y - p1.y) / (p2.x - p1.x);
+	int nurk = atan(param) * 180 / CV_PI;
+	return nurk;
+}
+
+void catch_ball(Mat frame){
+
+}
+
+tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 	
-	Mat frame, black_thresh, black_result, white_thresh, white_result;
-	cap >> frame;
-	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
+	Mat black_thresh, black_result, white_thresh, white_result;
 	
 	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
 	white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
@@ -487,11 +514,9 @@ tuple<Mat, Point2f, Point2f> get_frame_line(VideoCapture cap){
 }
 
 //check if goal in view
-tuple<Mat, Point2f> get_frame_goal(VideoCapture cap, vector<int> goal){
-	Mat frame, goal_thresh;
-	cap >> frame;
-	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
-
+tuple<Mat, Point2f> get_frame_goal(Mat frame, vector<int> goal){
+	Mat goal_thresh;
+	
 	goal_thresh = preprocess(frame, goal[0], goal[1], goal[2], goal[3], goal[4], goal[5]);
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
@@ -502,10 +527,8 @@ tuple<Mat, Point2f> get_frame_goal(VideoCapture cap, vector<int> goal){
 }
 
 //check if ball in view
-tuple<Mat, Point2f, float> get_frame_ball(VideoCapture cap, vector<int> ball){
-	Mat frame, ball_thresh;
-	cap >> frame;
-	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
+tuple<Mat, Point2f, float> get_frame_ball(Mat frame, vector<int> ball){
+	Mat ball_thresh;
 
 	ball_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
 	findContours(ball_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
@@ -580,10 +603,13 @@ int main() {
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
 		for (;;) {
+			Mat frame;
+			cap >> frame;
+			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 			Point2f corner1;
 			float kaugus;
-			Mat frame;
-			tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
+			
+			tie(frame, corner1, kaugus) = get_frame_ball(frame, ball_calib);
 			cout << kaugus << endl;
 			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
 			imshow("calibrate", frame);
@@ -624,15 +650,18 @@ int main() {
 		bool tribler = false;
 
 		for (;;) {
+			cap >> frame;
+			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
+			
 			/*
 			while (stopbool ==true){
-				Mat frame;
-				Point2f corner1, corner2;
-				float kaugus;
-				tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
-				cout << kaugus << endl;
-				imshow("test", frame);
-				waitKey(10);
+			Mat frame;
+			Point2f corner1, corner2;
+			float kaugus;
+			tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
+			cout << kaugus << endl;
+			imshow("test", frame);
+			waitKey(10);
 			}
 			*/
 			if (respond == true){
@@ -643,13 +672,21 @@ int main() {
 			serial.send("bl\r\n");
 
 			if (bl == true){
-				if (mc_goal.x == -1){
+				Point2f g;
+				if (goal_select == true){
+					tie(frame, g) = get_frame_goal(frame, yellow_calib);
+				}
+				else{
+					tie(frame, g) = get_frame_goal(frame, blue_calib);
+				}
+				if (g.x == -1){
 					//search goal
 					/*
 					turn max 6 times(360deg), if no goal found move on
 					*/
 					int countTurn = 0;
 					while (countTurn < 6){
+						
 						//float *liigu = turn16();
 						//get frame
 						//check if goal now in view, if yes, break
@@ -670,13 +707,34 @@ int main() {
 				}
 			}
 			else {
-				if (mc_ball.x == -1){
+				cout << "hia" << endl;
+				Point2f b;
+				float kaugus;
+				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
+				if (b.x == -1){
+					
 					//search ball
 					/*
 					turn max 6 times(360deg), if no ball found move on
 					*/
+					for (int i = 0; i < 6; i++){
+						cap >> frame;
+						Point2f p1, p2;
+						tie(frame, p1, p2) = get_frame_line(frame);
+						if (p1.x != -1){//joon on näha
+							int nurk = tous(p1, p2);
+							cout << nurk << endl;
 
-					//float *liigu = turn16();
+						}
+						else{//joont pole näha
+							turn16(true, serial);
+						}
+						imshow("orig", frame);
+						waitKey(10);
+					}
+					cout << "turned" << endl;
+					sleepcp(500);
+
 				}
 				else{
 					//handle catching
@@ -690,6 +748,7 @@ int main() {
 
 			imshow("orig", frame);
 			waitKey(10);
+		
 		}
 	}
 
