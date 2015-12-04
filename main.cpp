@@ -365,120 +365,28 @@ void no_ball(Point2f mc_ball, float kaugus, SerialClass& serial){
 		}
 	}
 }
-/*
-tuple<Mat, Point2f, Point2f, float> get_frame(VideoCapture cap, vector<int> ball, vector<int> yellow, vector<int> blue, int state){
-	if (state == 1){//competition mode
-		Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
-		cap >> frame;
-		if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-		//BALL
-		Point2f mc_ball;//mass centers
-
-		pall_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
-
-		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-		black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
-		white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
-
-		dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
-		bitwise_and(white_thresh, black_thresh, white_result);
-
-		findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-		Point2f mc_black, mc_white, corner1, corner2;
-		tie(mc_black, corner1, corner2) = process_goal(contours_black, frame, Scalar(0, 0, 0));
-		tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
-
-		pair<Point2f, float> result = process_ball(contours_ball, frame, corner1, corner2);
-		mc_ball = result.first;
-		float raadius = result.second;
-
-		//arvutame palli !umbkaudse! kauguse kaamerast
-		//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
-		float palli_kaugus;
-		if (raadius != 0){
-			palli_kaugus = 2.5 * 1060 / (2 * raadius);
-		}
-		else{
-			palli_kaugus = -1;
-		}
-		putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
-			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-
-		//GOAL
-		if (goal_select == true){//yellow
-			goal_thresh = preprocess(frame, yellow[0], yellow[1], yellow[2], yellow[3], yellow[4], yellow[5]);
-
-		}
-		if (goal_select == false){//blue
-			goal_thresh = preprocess(frame, blue[0], blue[1], blue[2], blue[3], blue[4], blue[5]);
-		}
-
-		findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-		Point2f mc_goal, lamp0, lamp1;
-		tie(mc_goal, lamp0, lamp1) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-		return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
-	}
-	else{
-		Mat frame, pall_thresh, goal_thresh, black_thresh, black_result, white_thresh, white_result;
-		cap >> frame;
-		if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
-
-		//BALL
-		Point2f mc_ball;//mass centers
-
-		pall_thresh = preprocess(frame, ball[0], ball[1], ball[2], ball[3], ball[4], ball[5]);
-		imshow("ball", pall_thresh);
-		waitKey(10);
-
-		findContours(pall_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-
-		black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
-		white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
-
-		dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
-		bitwise_and(white_thresh, black_thresh, white_result);
-
-		findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-		Point2f mc_black, mc_white, corner1, corner2;
-		tie(mc_black, corner1, corner2) = process_goal(contours_black, frame, Scalar(0, 0, 0));
-		tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
-
-		pair<Point2f, float> result = process_ball(contours_ball, frame, corner1, corner2);
-		mc_ball = result.first;
-		float raadius = result.second;
-
-		//arvutame palli !umbkaudse! kauguse kaamerast
-		//päris palli suurus * käsitsi leitud fokaalpikkuse parameeter/palli diameeter pikslites
-		float palli_kaugus;
-		if (raadius != 0){
-			palli_kaugus = 2.5 * 1060 / (2 * raadius);
-		}
-		else{
-			palli_kaugus = -1;
-		}
-		putText(frame, (to_string(palli_kaugus) + "cm"), cvPoint(30, 60),
-			FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(0, 0, 255), 1, CV_AA);
-
+tuple<Mat, Point2f, Point2f> get_frame_line(VideoCapture cap){
 	
-		goal_thresh = preprocess(frame, yellow[0], yellow[1], yellow[2], yellow[3], yellow[4], yellow[5]);
-		imshow("yellow", goal_thresh);
-		waitKey(10);
-		goal_thresh = preprocess(frame, blue[0], blue[1], blue[2], blue[3], blue[4], blue[5]);
-		imshow("blue", goal_thresh);
-		waitKey(10);
+	Mat frame, black_thresh, black_result, white_thresh, white_result;
+	cap >> frame;
+	if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
+	
+	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
+	white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
 
-		findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
+	bitwise_and(white_thresh, black_thresh, white_result);
 
-		Point2f mc_goal, lamp0, lamp1;
-		tie(mc_goal, lamp0, lamp1) = process_goal(contours_goal1, frame, Scalar(255, 255, 255));
-		return make_tuple(frame, mc_ball, mc_goal, palli_kaugus);
-	}
+	findContours(white_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	Point2f mc_black, mc_white, corner1, corner2;
+
+	tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
+	
+	return make_tuple(frame, corner1, corner2);
 	
 }
-*/
+
 //check if goal in view
 tuple<Mat, Point2f> get_frame_goal(VideoCapture cap, vector<int> goal){
 	Mat frame, goal_thresh;
@@ -510,7 +418,7 @@ tuple<Mat, Point2f> get_frame_ball(VideoCapture cap, vector<int> ball){
 }
 
 int main() {
-	int state = 0;//select state 0-calib color, no serial; 1- competition mode, no trackbars
+	int state = 1;//select state 0-calib color, no serial; 1- competition mode, no trackbars
 	Mat frame;
 	Point2f mc_ball, mc_goal;
 	float kaugus;
@@ -613,11 +521,11 @@ int main() {
 
 		for (;;) {
 
-			while (stopbool == true){
+			while (true){
 				Mat frame;
-				Point2f wat;
-				//tie(frame, wat) = get_frame(cap);
-				//imshow("line", frame);
+				Point2f corner1, corner2;
+				tie(frame, corner1, corner2) = get_frame_line(cap);
+				imshow("test", frame);
 				waitKey(10);
 			}
 
