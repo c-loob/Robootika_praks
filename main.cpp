@@ -33,6 +33,8 @@ String my_robotID = "A";
 String my_field = "A";
 bool goal_select = true; //true = yellow, false = blue
 bool respond = false;
+bool otse = false;
+
 
 class SimpleSerial
 {
@@ -167,7 +169,7 @@ public:
 				//std::istream is2(&buffer);
 				std::string data(size, '\0');
 				is.read(&data[0], size);
-				std::cout << data << endl;
+				//std::cout << data << endl;
 				if (((data.length() > 6) && (data.compare("<4:bl:0>\n") == 0)) || ((data.length() > 6) && (data.compare("<4:bl:1>\n") == 0))){
 
 					char bl_det = data[6];
@@ -181,7 +183,7 @@ public:
 					}
 				}
 				else{
-					std::cout << data << endl;
+				//	std::cout << data << endl;
 					//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
 					//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
 					/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
@@ -268,7 +270,7 @@ void aim_ball(Mat frame, vector<int> ball, SerialClass& serial);
 void find_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void turn16(bool direction, SerialClass& serial);
-void turn(int speed, bool direction, SerialClass& serial);
+void turn(int speed, int direction, SerialClass& serial);
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -362,15 +364,17 @@ void turn16(bool direction, SerialClass& serial){//direction
 	movement(liigu, speed, serial);
 }
 
-void turn(int speed, bool direction, SerialClass& serial){
-	stop_movement(serial);//leiamind
-
+void turn(int speed, int direction, SerialClass& serial){
+	//sleepcp(100);
+	//stop_movement(serial);//leiamind
+	
 	float liigu[3] = { 0, 0, 0 };
-	if (direction == true){//vasakule
-		float liigu[3] = { 0, 0, 0.5 };
+	if (direction == 1){//vasakule
+		cout << "test" << endl;
+		liigu[2] = 0.5;
 	}
-	else{
-		float liigu[3] = { 0, 0, -0.5 };
+	if(direction ==0){
+		liigu[2] = -0.5;
 	}
 	movement(liigu, speed, serial);
 }
@@ -378,6 +382,7 @@ void turn(int speed, bool direction, SerialClass& serial){
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 	
 	Point2f mc;
+	bool direction;
 	while (true){
 		get_frame_goal(frame, goal);
 
@@ -385,12 +390,16 @@ void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 			break;
 		}
 		if (mc.x < 255){
-			turn(30, true, serial);
+			direction = true;
+			turn(30, direction, serial);
 		}
 		else if (mc.x > 385){
-			turn(30, false, serial);
+			direction = false;
+			turn(30, direction, serial);
 		}
 		else{
+			otse = true;
+
 			break;
 		}
 		
@@ -419,27 +428,31 @@ void find_goal(Mat frame, vector<int> goal, SerialClass& serial){
 void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 
 	stop_dribbler(serial);
-
+	int direction;
 	if (mc.x == -1){
 		
 	}
 	else if (kaugus > 100){//kaugel
-		if (mc.x < 255){
-			turn(30, true, serial);
+		if (mc.x < 320){
+			direction = 1;
+			turn(30, direction, serial);
 		}
-		else if (mc.x > 385){
-			turn(30, false, serial);
+		else if (mc.x > 320){
+			direction = 0;
+			turn(30, direction, serial);
 		}
 		else{
 			
 		}
 	}
 	else{//lähedal
-		if (mc.x < 255){
-			turn(30, true, serial);
+		if (mc.x < 320){
+			direction = 1;
+			turn(30, direction, serial);
 		}
-		else if (mc.x > 385){
-			turn(30, false, serial);
+		else if (mc.x > 320){
+			direction = 0;
+			turn(30, direction, serial);
 		}
 		else{
 			
@@ -659,8 +672,8 @@ int main() {
 		}
 		cout << "waiting for start command..." << endl;
 		bool tribler = false;
-
 		for (;;) {
+			
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 			
@@ -767,9 +780,10 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
-									if ((b.x > 255) && (b.x < 385)){
+									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										cout << "otse" << endl;
+										
 									}
 									else{
 										aim_ball(kaugus, b, serial);
@@ -782,7 +796,7 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
-									if ((b.x > 255) && (b.x < 385)){
+									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										cout << "otse" << endl;
 									}
@@ -800,7 +814,7 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
-									if ((b.x > 255) && (b.x < 385)){
+									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										cout << "otse" << endl;
 									}
@@ -815,7 +829,7 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
-									if ((b.x > 255) && (b.x < 385)){
+									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										cout << "otse" << endl;
 									}
@@ -828,9 +842,10 @@ int main() {
 
 					}
 					else{//joont pole näha
-						if ((b.x > 255) && (b.x < 385)){
+						if ((b.x > 275) && (b.x < 365)){
 							//OTSE
 							cout << "otse" << endl;
+							
 						}
 						else{
 							aim_ball(kaugus, b, serial);
