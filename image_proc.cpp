@@ -12,7 +12,42 @@ float eucl_dist(Point2f corner1, Point2f corner2){
 }
 
 //get thersholded, eroded etc img
-Mat preprocess(Mat frame, int lowH, int lowS, int lowV, int highH, int highS, int highV) {
+Mat preprocess(Mat frame, int lowH, int highH, int lowS, int highS, int lowV, int highV) {
+	/*
+	if (lowH < 0){
+		lowH = 0;
+	}
+	else if (lowH>180){
+		lowH = 180;
+	}
+	if (highH < 0){
+		highH = 0;
+	}
+	else if (highH>180){
+		highH = 180;
+	}
+	if (highS < 0){
+		highS = 0;
+	}
+	else if (highH>255){
+		highH =255;
+	}
+	if (lowS < 0){
+		lowS = 0;
+	}
+	if (highV < 0){
+		highV = 0;
+	}
+	else if (highV>255){
+		highV = 255;
+	}
+	if (lowV < 0){
+		lowV = 0;
+	}
+	else if (lowV>255){
+		lowV = 255;
+	}
+	*/
 	Mat thresh, HSV;
 	cvtColor(frame, HSV, COLOR_BGR2HSV);//to HSV color space
 	inRange(HSV, Scalar(lowH, lowS, lowV), Scalar(highH, highS, highV), thresh);

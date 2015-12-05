@@ -143,10 +143,7 @@ public:
 			"\n",
 			boost::bind(&SerialClass::onData,
 			this, _1, _2));
-		async_read_until(port, buffer,
-			"-",
-			boost::bind(&SerialClass::onData,
-			this, _1, _2));
+	
 	}
 
 	void send(const std::string& text)
@@ -162,71 +159,75 @@ public:
 	void onData(const boost::system::error_code& e,
 		std::size_t size)
 	{
+		try{
+			if (!e)
+			{
 
-		if (!e)
-		{
-			std::istream is(&buffer);
-			//std::istream is2(&buffer);
-			std::string data(size, '\0');
-			is.read(&data[0], size);
-			std::cout << data << endl;
-			if (((data.length()>6) && (data.compare("<4:bl:0>\n")==0)) || ((data.length()>6)&&(data.compare("<4:bl:1>\n")==0))){
-				
-				char bl_det = data[6];
-				//cout << data<< endl;
-				//cout << bl_det;
-				if (bl_det == '0'){
-					bl = false;
+				std::istream is(&buffer);
+				//std::istream is2(&buffer);
+				std::string data(size, '\0');
+				is.read(&data[0], size);
+				std::cout << data << endl;
+				if (((data.length() > 6) && (data.compare("<4:bl:0>\n") == 0)) || ((data.length() > 6) && (data.compare("<4:bl:1>\n") == 0))){
+
+					char bl_det = data[6];
+					//cout << data<< endl;
+					//cout << bl_det;
+					if (bl_det == '0'){
+						bl = false;
+					}
+					else if (bl_det == '1'){
+						bl = true;
+					}
 				}
-				else if (bl_det == '1'){
-					bl = true;
-				}
-			}
-			else{
-			std::cout << data << endl;
-			//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
-			//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
-				/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
-					if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
+				else{
+					std::cout << data << endl;
+					//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
+					//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
+					/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
+						if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
 						if (data[2] == my_robotID[0]){
-							respond = true;
+						respond = true;
 						}*/
-			if ((data.find("AX") != std::string::npos) || (data.find("AA") != std::string::npos) || (data.find("XX") != std::string::npos)){
+					if ((data.find("AX") != std::string::npos) || (data.find("AA") != std::string::npos) || (data.find("XX") != std::string::npos)){
 						if (data.find("STOP") != std::string::npos){//command is STOP
 							std::cout << "stopping..1." << endl;
 							refstart = false;
 							stopbool = true;
 						}
 						else{//command is START
-						
+
 							refstart = true;
 							std::cout << "starting.1..." << endl;
 							stopbool = false;
 						}
-			}
-			if (data.find("STOP") != std::string::npos){//command is STOP
-				std::cout << "stopping..." << endl;
-				refstart = false;
-				stopbool = true;
-				std::cout << "stop" << endl;
-			}
-			else if (data.find("STAR") != std::string::npos){//command is START
+					}
+					if (data.find("STOP") != std::string::npos){//command is STOP
+						std::cout << "stopping..." << endl;
+						refstart = false;
+						stopbool = true;
+						std::cout << "stop" << endl;
+					}
+					else if (data.find("STAR") != std::string::npos){//command is START
 
-				refstart = true;
-				std::cout << "starting...." << endl;
-				stopbool = false;
-				std::cout << "start" << endl;
-			}
+						refstart = true;
+						std::cout << "starting...." << endl;
+						stopbool = false;
+						std::cout << "start" << endl;
+					}
 					//}
-				//}
-			//}
-			}
-			std::cout << data << endl;
-			//If we receive quit()\r\n indicate
-			//end of operations
-			quitFlag = (data.compare("quit()\r\n") == 0);
-		};
+					//}
+					//}
+				}
+				//std::cout << data << endl;
+				//If we receive quit()\r\n indicate
+				//end of operations
+				quitFlag = (data.compare("quit()\r\n") == 0);
+			};
+		}
+		catch (Exception &e){
 
+		}
 		startReceive();
 	};
 
@@ -415,41 +416,34 @@ void find_goal(Mat frame, vector<int> goal, SerialClass& serial){
 	}
 }
 
-void aim_ball(Mat frame, vector<int> ball, SerialClass& serial){
-	
-	float kaugus;
-	Point2f mc;
+void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 
 	stop_dribbler(serial);
 
-	while (true){
-		tie(frame, mc, kaugus) = get_frame_ball(frame, ball);
-		if (mc.x == -1){
-			break;
-		}
-		if (kaugus > 100){//kaugel
-			if (mc.x < 255){
-				turn(30, true, serial);
-			}
-			else if (mc.x > 385){
-				turn(30, false, serial);
-			}
-			else{
-				break;
-			}
-		}
-		else{//lähedal
-			if (mc.x < 255){
-				turn(30, true, serial);
-			}
-			else if (mc.x > 385){
-				turn(30, false, serial);
-			}
-			else{
-				break;
-			}
-		}
+	if (mc.x == -1){
 		
+	}
+	else if (kaugus > 100){//kaugel
+		if (mc.x < 255){
+			turn(30, true, serial);
+		}
+		else if (mc.x > 385){
+			turn(30, false, serial);
+		}
+		else{
+			
+		}
+	}
+	else{//lähedal
+		if (mc.x < 255){
+			turn(30, true, serial);
+		}
+		else if (mc.x > 385){
+			turn(30, false, serial);
+		}
+		else{
+			
+		}
 	}
 }
 
@@ -498,8 +492,8 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 	
 	Mat black_thresh, black_result, white_thresh, white_result;
 	
-	black_thresh = preprocess(frame, 0, 0, 0, 180, 255, 160);
-	white_thresh = preprocess(frame, 0, 0, 240, 180, 255, 255);
+	black_thresh = preprocess(frame, 0, 180, 0, 255, 0, 160);
+	white_thresh = preprocess(frame, 0, 180, 0, 255, 240, 255);
 
 	dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
 	bitwise_and(white_thresh, black_thresh, white_result);
@@ -569,7 +563,24 @@ int main() {
 			}
 		}
 	}
-
+	ball_calib[0] = 5;
+	ball_calib[1] = 25;
+	ball_calib[2] = 80;
+	ball_calib[3] = 255;
+	ball_calib[4] = 50;
+	ball_calib[5] = 255;
+	yellow_calib[0] = 15;
+	yellow_calib[1] = 40;
+	yellow_calib[2] = 100;
+	yellow_calib[3] = 255;
+	yellow_calib[4] = 70;
+	yellow_calib[5] = 255;
+	blue_calib[0] = 90;
+	blue_calib[1] = 108;
+	blue_calib[2] = 160;
+	blue_calib[3] = 255;
+	blue_calib[4] = 70;
+	blue_calib[5] = 221;
 	if (state == 0){
 		//trackbar creation
 		namedWindow("yellow", WINDOW_AUTOSIZE);//trackbaride aken
@@ -610,7 +621,7 @@ int main() {
 			float kaugus;
 			
 			tie(frame, corner1, kaugus) = get_frame_ball(frame, ball_calib);
-			cout << kaugus << endl;
+			//cout << kaugus << endl;
 			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
 			imshow("calibrate", frame);
 			waitKey(10);
@@ -732,7 +743,7 @@ int main() {
 						waitKey(10);
 					}
 					cout << "turned" << endl;
-					sleepcp(500);
+					//sleepcp(500);
 
 				}
 				else{
@@ -742,7 +753,89 @@ int main() {
 					if path clear, move to ball
 					else find better position
 					*/
-					cout << kaugus << endl;
+					
+					Point2f p1, p2;
+					tie(frame, p1, p2) = get_frame_line(frame);
+					if (p1.x != -1){//joon on näha
+						int nurk = tous(p1, p2);
+				
+						if (p1.y>p2.y){
+							int pallinurk = tous(b, p1);
+							if (nurk < 0){
+								if (pallinurk < nurk){
+									cout << "väljas" << endl;
+									//sleepcp(2000);
+								}
+								else{
+									if ((b.x > 255) && (b.x < 385)){
+										//OTSE
+										cout << "otse" << endl;
+									}
+									else{
+										aim_ball(kaugus, b, serial);
+									}
+								}
+							}
+							else{
+								if (pallinurk > nurk){
+									cout << "väljas" << endl;
+									//sleepcp(2000);
+								}
+								else{
+									if ((b.x > 255) && (b.x < 385)){
+										//OTSE
+										cout << "otse" << endl;
+									}
+									else{
+										aim_ball(kaugus, b, serial);
+									}
+								}
+							}
+						}
+						else{
+							int pallinurk = tous(b, p2);
+							if (nurk < 0){
+								if (pallinurk < nurk){
+									cout << "väljas" << endl;
+									//sleepcp(2000);
+								}
+								else{
+									if ((b.x > 255) && (b.x < 385)){
+										//OTSE
+										cout << "otse" << endl;
+									}
+									else{
+										aim_ball(kaugus, b, serial);
+									}
+								}
+							}
+							else{
+								if (pallinurk > nurk){
+									cout << "väljas" << endl;
+									//sleepcp(2000);
+								}
+								else{
+									if ((b.x > 255) && (b.x < 385)){
+										//OTSE
+										cout << "otse" << endl;
+									}
+									else{
+										aim_ball(kaugus, b, serial);
+									}
+								}
+							}
+						}
+
+					}
+					else{//joont pole näha
+						if ((b.x > 255) && (b.x < 385)){
+							//OTSE
+							cout << "otse" << endl;
+						}
+						else{
+							aim_ball(kaugus, b, serial);
+						}
+					}
 				}
 			}
 
