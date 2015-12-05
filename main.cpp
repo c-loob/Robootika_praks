@@ -787,7 +787,7 @@ int main() {
 							if (nurk < 0){
 								if (pallinurk < nurk){
 									cout << "väljas" << endl;
-									cout << "sees" << endl;
+									//cout << "sees" << endl;
 									//sleepcp(2000);
 								}
 								else{
