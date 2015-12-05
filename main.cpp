@@ -33,7 +33,6 @@ String my_robotID = "A";
 String my_field = "A";
 bool goal_select = true; //true = yellow, false = blue
 bool respond = false;
-bool otse = false;
 
 
 class SimpleSerial
@@ -271,6 +270,7 @@ void find_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void turn16(bool direction, SerialClass& serial);
 void turn(int speed, int direction, SerialClass& serial);
+void otse(int speed, SerialClass& serial);
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -370,7 +370,7 @@ void turn(int speed, int direction, SerialClass& serial){
 	
 	float liigu[3] = { 0, 0, 0 };
 	if (direction == 1){//vasakule
-		cout << "test" << endl;
+		//cout << "test" << endl;
 		liigu[2] = 0.5;
 	}
 	if(direction ==0){
@@ -398,7 +398,6 @@ void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 			turn(30, direction, serial);
 		}
 		else{
-			otse = true;
 
 			break;
 		}
@@ -499,6 +498,11 @@ int tous(Point2f p1, Point2f p2){
 
 void catch_ball(Mat frame){
 
+}
+
+void otse(int speed, SerialClass& serial){
+	float liigu[3] = { 1, 0, 0 };
+	movement(liigu, speed, serial);
 }
 
 tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
@@ -782,7 +786,8 @@ int main() {
 								else{
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
-										cout << "otse" << endl;
+										//cout << "otse" << endl;
+										otse(75, serial);
 										
 									}
 									else{
@@ -798,7 +803,9 @@ int main() {
 								else{
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
-										cout << "otse" << endl;
+										//cout << "otse" << endl;
+										otse(75, serial);
+
 									}
 									else{
 										aim_ball(kaugus, b, serial);
@@ -816,7 +823,9 @@ int main() {
 								else{
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
-										cout << "otse" << endl;
+										//cout << "otse" << endl;
+										otse(75, serial);
+
 									}
 									else{
 										aim_ball(kaugus, b, serial);
@@ -831,7 +840,9 @@ int main() {
 								else{
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
-										cout << "otse" << endl;
+										//cout << "otse" << endl;
+										otse(75, serial);
+
 									}
 									else{
 										aim_ball(kaugus, b, serial);
@@ -844,7 +855,9 @@ int main() {
 					else{//joont pole näha
 						if ((b.x > 275) && (b.x < 365)){
 							//OTSE
-							cout << "otse" << endl;
+							//cout << "otse" << endl;
+							otse(75, serial);
+
 							
 						}
 						else{
