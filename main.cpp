@@ -103,11 +103,11 @@ public:
 	{
 		//Stop the I/O services
 		io.stop();
-		
+
 		//Wait for the thread to finish
 		runner.join();
-		
-	
+
+
 	}
 
 	bool connect(const std::string& port_name, int baud = 19200)
@@ -119,7 +119,7 @@ public:
 		port.set_option(serial_port::flow_control(
 			serial_port::flow_control::none));
 
-		if ((port.is_open())&&(port_name.compare("COM4")))//if is open AND is NOT COM4
+		if ((port.is_open()) && (port_name.compare("COM4")))//if is open AND is NOT COM4
 		{
 			//Start io-service in a background thread.
 			//boost::bind binds the ioservice instance
@@ -144,7 +144,7 @@ public:
 			"\n",
 			boost::bind(&SerialClass::onData,
 			this, _1, _2));
-	
+
 	}
 
 	void send(const std::string& text)
@@ -182,14 +182,14 @@ public:
 					}
 				}
 				else{
-				//	std::cout << data << endl;
+					//	std::cout << data << endl;
 					//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
 					//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
 					/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
-						if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
-						if (data[2] == my_robotID[0]){
-						respond = true;
-						}*/
+					if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
+					if (data[2] == my_robotID[0]){
+					respond = true;
+					}*/
 					if ((data.find("AX") != std::string::npos) || (data.find("AA") != std::string::npos) || (data.find("XX") != std::string::npos)){
 						if (data.find("STOP") != std::string::npos){//command is STOP
 							std::cout << "stopping..1." << endl;
@@ -352,17 +352,17 @@ void stop_movement(SerialClass& serial){
 }
 
 void turn16(bool direction, SerialClass& serial){//direction 
-	float turnamount =0.8;//pos == vasakule
+	float turnamount = 0.8;//pos == vasakule
 	float strafe = 0.3;
 	int speed = 40;
 	float liigu[3] = { 0, 0, 0 };
 	if (direction == true){
 		liigu[1] = strafe;
-		liigu[2] = turnamount ;
+		liigu[2] = turnamount;
 	}
 	else{
 		liigu[1] = -strafe;
-		liigu[2] =-turnamount ;
+		liigu[2] = -turnamount;
 	}
 	movement(liigu, speed, serial);
 	//sleepcp(2000);
@@ -371,20 +371,20 @@ void turn16(bool direction, SerialClass& serial){//direction
 void turn(int speed, int direction, SerialClass& serial){
 	//sleepcp(100);
 	//stop_movement(serial);//leiamind
-	
+
 	float liigu[3] = { 0, 0, 0 };
 	if (direction == 1){//vasakule
 		//cout << "test" << endl;
 		liigu[2] = 0.5;
 	}
-	if(direction ==0){
+	if (direction == 0){
 		liigu[2] = -0.5;
 	}
 	movement(liigu, speed, serial);
 }
 
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
-	
+
 	Point2f mc;
 	bool direction;
 	while (true){
@@ -405,7 +405,7 @@ void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 
 			break;
 		}
-		
+
 	}
 }
 
@@ -433,7 +433,7 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 	stop_dribbler(serial);
 	int direction;
 	if (mc.x == -1){
-		
+
 	}
 	else if (kaugus > 100){//kaugel
 		if (mc.x < 320){
@@ -445,7 +445,7 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 			turn(30, direction, serial);
 		}
 		else{
-			
+
 		}
 	}
 	else{//lähedal
@@ -458,7 +458,7 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 			turn(30, direction, serial);
 		}
 		else{
-			
+
 		}
 	}
 }
@@ -466,7 +466,7 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 void find_ball(Mat frame, vector<int> ball, SerialClass& serial){
 	stop_dribbler(serial);
 
-	
+
 	Point2f mc;
 	float kaugus;
 
@@ -480,7 +480,7 @@ void find_ball(Mat frame, vector<int> ball, SerialClass& serial){
 				turn16(true, serial);//vasakule
 			}
 		}
-		
+
 		//change position
 	}
 }
@@ -510,9 +510,9 @@ void otse(int speed, SerialClass& serial){
 }
 
 tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
-	
+
 	Mat black_thresh, black_result, white_thresh, white_result;
-	
+
 	black_thresh = preprocess(frame, 0, 180, 0, 255, 0, 160);
 	white_thresh = preprocess(frame, 0, 180, 0, 255, 160, 255);
 
@@ -523,15 +523,15 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 	Point2f mc_black, mc_white, corner1, corner2;
 
 	tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
-	
+
 	return make_tuple(frame, corner1, corner2);
-	
+
 }
 
 //check if goal in view
 tuple<Mat, Point2f> get_frame_goal(Mat frame, vector<int> goal){
 	Mat goal_thresh;
-	
+
 	goal_thresh = preprocess(frame, goal[0], goal[1], goal[2], goal[3], goal[4], goal[5]);
 	findContours(goal_thresh, contours_goal1, hierarchy_goal, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
@@ -564,7 +564,7 @@ int main() {
 	ifstream calib_param;
 	calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
-	
+
 	std::vector<int> ball_calib;
 	std::vector<int> yellow_calib;
 	std::vector<int> blue_calib;
@@ -642,7 +642,7 @@ int main() {
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 			Point2f corner1;
 			float kaugus;
-			
+
 			tie(frame, corner1, kaugus) = get_frame_ball(frame, ball_calib);
 			//cout << kaugus << endl;
 			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
@@ -650,7 +650,7 @@ int main() {
 			waitKey(10);
 		}
 	}
-	else if (state ==1){
+	else if (state == 1){
 		//connect to serial ports
 		SerialClass serial;//control motors etc
 
@@ -683,10 +683,10 @@ int main() {
 		cout << "waiting for start command..." << endl;
 		bool tribler = false;
 		for (;;) {
-			
+
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
-			
+
 			/*
 			while (stopbool ==true){
 			Mat frame;
@@ -720,7 +720,7 @@ int main() {
 					*/
 					int countTurn = 0;
 					while (countTurn < 6){
-						
+
 						//float *liigu = turn16();
 						//get frame
 						//check if goal now in view, if yes, break
@@ -745,7 +745,7 @@ int main() {
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
 				if (b.x == -1){
-					
+
 					//search ball
 					/*
 					turn max 6 times(360deg), if no ball found move on
@@ -776,14 +776,31 @@ int main() {
 					if path clear, move to ball
 					else find better position
 					*/
-					
+
 					Point2f p1, p2;
 					tie(frame, p1, p2) = get_frame_line(frame);
 					if (p1.x != -1){//joon on näha
 						int nurk = tous(p1, p2);
-				
+						if ((nurk > -10) && (nurk < 10)){
+							if ((b.y < p1.y) || (b.y < p2.y)){
+								cout << "väljas" << endl;
+							}
+							else{
+								cout << "sees" << endl;
+								if ((b.x > 275) && (b.x < 365)){
+									//OTSE
+									//cout << "otse" << endl;
+									otse(75, serial);
+
+								}
+								else{
+									aim_ball(kaugus, b, serial);
+								}
+							}
+						}
 						if (p1.y>p2.y){
 							int pallinurk = tous(b, p1);
+
 							if (nurk < 0){
 								if (pallinurk < nurk){
 									cout << "väljas" << endl;
@@ -797,7 +814,7 @@ int main() {
 										//OTSE
 										//cout << "otse" << endl;
 										otse(75, serial);
-										
+
 									}
 									else{
 										aim_ball(kaugus, b, serial);
@@ -873,7 +890,7 @@ int main() {
 							//cout << "otse" << endl;
 							otse(75, serial);
 
-							
+
 						}
 						else{
 							aim_ball(kaugus, b, serial);
@@ -884,7 +901,7 @@ int main() {
 
 			imshow("orig", frame);
 			waitKey(10);
-		
+
 		}
 	}
 
