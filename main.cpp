@@ -34,6 +34,8 @@ String my_field = "A";
 bool goal_select = true; //true = yellow, false = blue
 bool respond = false;
 
+int turncounter = 0;
+
 
 class SimpleSerial
 {
@@ -278,8 +280,8 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 
 	int *kiirused;
 	//leia mind
-	kiirused = get_speed(jouvektor, max_speed);
-	//kiirused = get_speed(jouvektor, 0);
+	//kiirused = get_speed(jouvektor, max_speed);
+	kiirused = get_speed(jouvektor, 0);
 
 	move_robot(kiirused, serial);
 
@@ -351,12 +353,12 @@ void stop_movement(SerialClass& serial){
 	movement(liigu, 0, serial);
 }
 
-void turn16(bool direction, SerialClass& serial){//direction 
+void turn16(bool direction, SerialClass& serial){//direction false == vasakule
 	float turnamount = 0.8;//pos == vasakule
 	float strafe = 0.3;
 	int speed = 40;
 	float liigu[3] = { 0, 0, 0 };
-	if (direction == true){
+	if (direction == false){
 		liigu[1] = strafe;
 		liigu[2] = turnamount;
 	}
@@ -365,7 +367,9 @@ void turn16(bool direction, SerialClass& serial){//direction
 		liigu[2] = -turnamount;
 	}
 	movement(liigu, speed, serial);
-	
+	sleepcp(1000);
+
+
 }
 
 void turn(int speed, int direction, SerialClass& serial){
@@ -409,25 +413,6 @@ void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 	}
 }
 
-void find_goal(Mat frame, vector<int> goal, SerialClass& serial){
-	stop_dribbler(serial);
-
-	Point2f mc;
-
-	while (mc.x == -1){
-		for (int i = 0; i < 6; i++){//max 6 times
-			tie(frame, mc) = get_frame_goal(frame, goal);
-			if (mc.x != -1){
-				break;
-			}
-			else{
-				turn16(true, serial);//vasakule
-			}
-		}
-		//change position
-	}
-}
-
 void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 
 	stop_dribbler(serial);
@@ -463,28 +448,6 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 	}
 }
 
-void find_ball(Mat frame, vector<int> ball, SerialClass& serial){
-	stop_dribbler(serial);
-
-
-	Point2f mc;
-	float kaugus;
-
-	while (mc.x == -1){
-		for (int i = 0; i < 6; i++){//max 6 times
-			tie(frame, mc, kaugus) = get_frame_ball(frame, ball);
-			if (mc.x != -1){
-				break;
-			}
-			else{
-				turn16(true, serial);//vasakule
-			}
-		}
-
-		//change position
-	}
-}
-
 void change_position_ball(Mat frame){
 	Point2f p1, p2;
 	tie(frame, p1, p2) = get_frame_line(frame);
@@ -507,6 +470,16 @@ void catch_ball(Mat frame){
 void otse(int speed, SerialClass& serial){
 	float liigu[3] = { 1, 0, 0 };
 	movement(liigu, speed, serial);
+	sleepcp(500);
+}
+
+void charge(SerialClass& serial){
+	serial.send("c\r\n");
+	sleepcp(2000);
+}
+
+void kick(SerialClass& serial){
+	serial.send("k\r\n");
 }
 
 tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
@@ -745,42 +718,93 @@ int main() {
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
 				if (b.x == -1){
+					
+					turn16(true, serial);
+					
+					turncounter++;
+					if (turncounter > 5){
+						cout << "turned" << endl;
+						turncounter = 0;
+						turn16(false, serial);
 
-					//search ball
-					/*
-					turn max 6 times(360deg), if no ball found move on
-					*/
-					for (int i = 0; i < 6; i++){
 						cap >> frame;
+						tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
+
 						Point2f p1, p2;
 						tie(frame, p1, p2) = get_frame_line(frame);
-
-						Point2f tempb;
-						tie(frame, tempb, kaugus) = get_frame_ball(frame, ball_calib);
-						if (tempb.x != -1){
-							break;
+						
+						int ykaugus = 300;
+						int minunurk;
+						if (p1.y < p2.y){
+							Point2f temp;
+							temp.x = p2.x;
+							temp.y = 300;
+							minunurk = tous(p2, temp);
+						}
+						else if (p1.y> p2.y){
+							Point2f temp;
+							temp.x = p1.x;
+							temp.y = 300;
+							minunurk = tous(p2, temp);
+						}
+						else{
+							Point2f temp;
+							temp.x = p2.x;
+							temp.y = 300;
+							minunurk = tous(p2, temp);
 						}
 
-						turn16(true, serial);
-						sleepcp(1000);
-						
-						imshow("orig", frame);
-						waitKey(10);
+						int nurk = tous(p1, p2);
+
+						if ((nurk < 10) && (nurk>-10)){
+							// horisontaalne
+							if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon jääb liikumisele ette
+								//ära liigu
+								turn16(false, serial);
+								turn16(false, serial);
+								turn16(false, serial);
+
+							}
+							else{
+								otse(75, serial);
+								
+							}
+						}
+						else if (nurk < 0){
+							if (minunurk < nurk){
+								//väljs
+								/*
+								LISADA
+								strafe paremale
+								*/
+								turn16(true, serial);// joonest eemale
+								turn16(true, serial);
+
+							}
+							else{
+								otse(75, serial);
+								
+							}
+						}
+						else{
+							if (minunurk > nurk){
+								//väljas
+								/*
+								LISADA
+								strafe vasakule
+								*/
+								turn16(false, serial);
+								turn16(false, serial);
+
+							}
+							else{
+								otse(75, serial);
+
+							}
+						}
 					}
-					tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
-					if (b.x == -1){
-						//change position
-						//lisada
-						/*
-						joon näha?
-						kas otse minnes ristume joonega? sarnane palliga, palli pt asemel nt keskel (320, 240)
-						kui jah, siis pööra veel korra ja proovi uuesti.
-						*/
-						cout << "turned" << endl;
-						turn16(false, serial);
-					}
-					
-					
+
+
 
 				}
 				else{
@@ -790,7 +814,7 @@ int main() {
 					if path clear, move to ball
 					else find better position
 					*/
-
+					turncounter = 0;
 					Point2f p1, p2;
 					tie(frame, p1, p2) = get_frame_line(frame);
 					if (p1.x != -1){//joon on näha
@@ -798,11 +822,11 @@ int main() {
 						if ((nurk > -10) && (nurk < 10)){
 							if ((b.y < p1.y) || (b.y < p2.y)){
 								cout << "väljas" << endl;
-								//lisada
-								/*
-								pööra 2x, kontrolli ristumist joonega otse minnes
-								pane otse edasi, otsi jälle
-								*/
+								turn16(false, serial);
+								turn16(false, serial);
+								turn16(false, serial);
+
+
 							}
 							else{
 								cout << "sees" << endl;
@@ -826,8 +850,12 @@ int main() {
 									//lisada
 									/*
 									pööra 2x, kontrolli ristumist joonega otse minnes
+									
 									pane otse edasi, otsi jälle
 									*/
+									turn16(true, serial);//joonest eemale
+									turn16(true, serial);
+
 								}
 								else{
 									cout << "sees" << endl;
@@ -851,6 +879,9 @@ int main() {
 									pööra 2x, kontrolli ristumist joonega otse minnes
 									pane otse edasi, otsi jälle
 									*/
+									turn16(false, serial);
+									turn16(false, serial);
+
 								}
 								else{
 									cout << "sees" << endl;
@@ -877,6 +908,9 @@ int main() {
 									pööra 2x, kontrolli ristumist joonega otse minnes
 									pane otse edasi, otsi jälle
 									*/
+									turn16(true, serial);
+									turn16(true, serial);
+
 								}
 								else{
 									cout << "sees" << endl;
@@ -900,6 +934,9 @@ int main() {
 									pööra 2x, kontrolli ristumist joonega otse minnes
 									pane otse edasi, otsi jälle
 									*/
+									turn16(false, serial);
+									turn16(false, serial);
+
 								}
 								else{
 									cout << "sees" << endl;
