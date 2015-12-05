@@ -36,7 +36,7 @@ bool respond = false;
 
 int turncounter = 0;
 int turncounter_g = 0;
-
+int globspeed = 50;
 
 class SimpleSerial
 {
@@ -281,8 +281,8 @@ void movement(float liigu[3], int max_speed, SerialClass& serial){
 
 	int *kiirused;
 	//leia mind
-	//kiirused = get_speed(jouvektor, max_speed);
-	kiirused = get_speed(jouvektor, 0);
+	kiirused = get_speed(jouvektor, max_speed);
+	//kiirused = get_speed(jouvektor, 0);
 
 	move_robot(kiirused, serial);
 
@@ -352,6 +352,7 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 void stop_movement(SerialClass& serial){
 	float liigu[3] = { 0, 0, 0 };
 	movement(liigu, 0, serial);
+	sleepcp(500);
 }
 
 void turn16(bool direction, SerialClass& serial){//direction false == vasakule
@@ -694,7 +695,7 @@ int main() {
 					*/
 					turn16(false, serial);
 					turncounter_g++;
-					if(turncounter_g > 5){
+					if (turncounter_g > 5){
 						turncounter_g = 0;
 						//move to new pos
 
@@ -706,10 +707,10 @@ int main() {
 
 						Point2f tempg;
 						if (goal_select == true){
-						tie(frame, tempg) = get_frame_goal(frame, yellow_calib);
+							tie(frame, tempg) = get_frame_goal(frame, yellow_calib);
 						}
 						else{
-						tie(frame, tempg) = get_frame_goal(frame, blue_calib);
+							tie(frame, tempg) = get_frame_goal(frame, blue_calib);
 						}
 
 						Point2f p1, p2;
@@ -749,7 +750,7 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 							}
@@ -765,7 +766,7 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 							}
@@ -781,13 +782,13 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 							}
 						}
 						else{
-							otse(75, serial);
+							otse(globspeed, serial);
 						}
 
 					}
@@ -799,6 +800,14 @@ int main() {
 				}
 				else{
 					turncounter_g = 0;
+					float temporrar = 111;
+					if ((g.x<275) || (g.x >365)){
+						aim_ball(temporrar, g, serial);
+					}
+					else{
+						charge(serial);
+						kick(serial);
+					}
 					//handle shooting
 					/*
 					if shot clear shoot,
@@ -811,9 +820,9 @@ int main() {
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
 				if (b.x == -1){
-					
+
 					turn16(true, serial);
-					
+
 					turncounter++;
 					if (turncounter > 5){
 						cout << "turned" << endl;
@@ -860,7 +869,7 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(50, serial);
 
 								}
 							}
@@ -876,7 +885,7 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 							}
@@ -892,13 +901,13 @@ int main() {
 
 								}
 								else{
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 							}
 						}
 						else{
-							otse(75, serial);
+							otse(globspeed, serial);
 						}
 					}
 
@@ -931,7 +940,7 @@ int main() {
 								if ((b.x > 275) && (b.x < 365)){
 									//OTSE
 									//cout << "otse" << endl;
-									otse(75, serial);
+									otse(globspeed, serial);
 
 								}
 								else{
@@ -948,7 +957,7 @@ int main() {
 									//lisada
 									/*
 									pööra 2x, kontrolli ristumist joonega otse minnes
-									
+
 									pane otse edasi, otsi jälle
 									*/
 									turn16(true, serial);//joonest eemale
@@ -961,7 +970,7 @@ int main() {
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
-										otse(75, serial);
+										otse(globspeed, serial);
 
 									}
 									else{
@@ -987,7 +996,7 @@ int main() {
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
-										otse(75, serial);
+										otse(globspeed, serial);
 
 									}
 									else{
@@ -1016,7 +1025,7 @@ int main() {
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
-										otse(75, serial);
+										otse(globspeed, serial);
 
 									}
 									else{
@@ -1042,7 +1051,7 @@ int main() {
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
-										otse(75, serial);
+										otse(globspeed, serial);
 
 									}
 									else{
@@ -1057,7 +1066,7 @@ int main() {
 						if ((b.x > 275) && (b.x < 365)){
 							//OTSE
 							//cout << "otse" << endl;
-							otse(75, serial);
+							otse(globspeed, serial);
 
 
 						}
