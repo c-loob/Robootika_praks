@@ -23,7 +23,7 @@ using namespace std;
 vector< vector<Point> > contours_ball, contours_goal1, contours_goal2, contours_black, contours_white;
 vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black, hierarchy_white;
 
-bool dribbler;
+bool dribbler = false;
 bool suund;
 mutex mu;
 bool refstart = false;
@@ -36,7 +36,7 @@ bool respond = false;
 
 int turncounter = 0;
 int turncounter_g = 0;
-int globspeed = 50;
+int globspeed = 70;
 
 class SimpleSerial
 {
@@ -272,8 +272,9 @@ void aim_ball(Mat frame, vector<int> ball, SerialClass& serial);
 void find_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial);
 void turn16(bool direction, SerialClass& serial);
-void turn(int speed, int direction, SerialClass& serial);
+void turn(int speed, float mc, SerialClass& serial);
 void otse(int speed, SerialClass& serial);
+void stop_movement(SerialClass& serial);
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -306,16 +307,24 @@ void move_robot(int * kiirus, SerialClass& serial){//PRODUCER
 }
 
 void set_dribbler(SerialClass& serial){
-	String cmd = "";
-	cmd = "dm150\r\n";
-	serial.send(cmd);
-	sleepcp(500);
-	cmd = ("dm125\r\n");
-	serial.send(cmd);
+	if (dribbler == false){
+		cout << "wut";
+		String cmd = "";
+		cmd = "dm150\r\n";
+		serial.send(cmd);
+		stop_movement(serial);
+		sleepcp(500);
+		cmd = ("dm125\r\n");
+		serial.send(cmd);
+		dribbler = true;
+	}
 }
 
 void stop_dribbler(SerialClass& serial){
-	serial.send("dm0\r\n");
+	if (dribbler == true){
+		serial.send("dm0\r\n");
+		dribbler = false;
+	}
 }
 
 void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
@@ -352,102 +361,94 @@ void ball_in(Point2f mc_goal, SerialClass& serial){//ball in dribbler
 void stop_movement(SerialClass& serial){
 	float liigu[3] = { 0, 0, 0 };
 	movement(liigu, 0, serial);
-	sleepcp(500);
+	//sleepcp(500);
 }
 
 void turn16(bool direction, SerialClass& serial){//direction false == vasakule
 	float turnamount = 0.8;//pos == vasakule
-	float strafe = 0.3;
-	int speed = 40;
-	float liigu[3] = { 0, 0, 0 };
-	if (direction == false){
-		liigu[1] = strafe;
-		liigu[2] = turnamount;
+	float strafe = 0.2;
+	int speed = 80;
+
+	if (direction == true){
+		float liigu[3] = { 0, strafe, turnamount };
+		movement(liigu, speed, serial);
+
 	}
 	else{
-		liigu[1] = -strafe;
-		liigu[2] = -turnamount;
+		float liigu[3] = { 0, -strafe, -turnamount };
+		movement(liigu, speed, serial);
+
 	}
-	movement(liigu, speed, serial);
-	sleepcp(1000);
+	//movement(liigu, speed, serial);
+	sleepcp(100);
 
 
 }
 
-void turn(int speed, int direction, SerialClass& serial){
+void turn(int speed, float mc, SerialClass& serial){
 	//sleepcp(100);
 	//stop_movement(serial);//leiamind
 
-	float liigu[3] = { 0, 0, 0 };
-	if (direction == 1){//vasakule
+	//cout << mc << endl;
+	if (mc == 0){//vasakule
 		//cout << "test" << endl;
-		liigu[2] = 0.5;
+		float liigu[3] = { 0.4, 0, 0.8 };
+		movement(liigu, speed, serial);
 	}
-	if (direction == 0){
-		liigu[2] = -0.5;
+	else if (mc == 1){
+		float liigu[3] = { 0.4, 0, -0.8 };
+		movement(liigu, speed, serial);
 	}
-	movement(liigu, speed, serial);
+
 }
 
 void aim_goal(Mat frame, vector<int> goal, SerialClass& serial){
 
 	Point2f mc;
-	bool direction;
-	while (true){
-		get_frame_goal(frame, goal);
+	int direction;
 
-		if (mc.x == -1){
-			break;
-		}
-		if (mc.x < 255){
-			direction = true;
-			turn(30, direction, serial);
-		}
-		else if (mc.x > 385){
-			direction = false;
-			turn(30, direction, serial);
-		}
-		else{
+	turn(30, mc.x, serial);
 
-			break;
-		}
 
-	}
 }
 
 void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 
-	stop_dribbler(serial);
-	int direction;
-	if (mc.x == -1){
 
+	int direction;
+	if (kaugus == 999){
+		if (mc.x < 320){
+
+			turn(30, 0, serial);
+		}
+		else if (mc.x > 320){
+
+			turn(30, 1, serial);
+		}
 	}
 	else if (kaugus > 100){//kaugel
-		if (mc.x < 320){
-			direction = 1;
-			turn(30, direction, serial);
-		}
-		else if (mc.x > 320){
-			direction = 0;
-			turn(30, direction, serial);
-		}
-		else{
+		if (mc.x < 275){
 
+			turn(50, 0, serial);
 		}
+		else if (mc.x > 365){
+
+			turn(50, 1, serial);
+		}
+
 	}
 	else{//l‰hedal
-		if (mc.x < 320){
+		if (mc.x < 275){
 			direction = 1;
-			turn(30, direction, serial);
+			turn(30, 0, serial);
 		}
-		else if (mc.x > 320){
+		else if (mc.x > 365){
 			direction = 0;
-			turn(30, direction, serial);
+			turn(30, 1, serial);
 		}
-		else{
 
-		}
 	}
+	return;
 }
 
 void change_position_ball(Mat frame){
@@ -455,7 +456,7 @@ void change_position_ball(Mat frame){
 	tie(frame, p1, p2) = get_frame_line(frame);
 	if (p1.x != -1){//joon n‰ha
 		int nurk = tous(p1, p2);
-		cout << nurk << endl;
+		//cout << nurk << endl;
 	}
 }
 
@@ -472,7 +473,7 @@ void catch_ball(Mat frame){
 void otse(int speed, SerialClass& serial){
 	float liigu[3] = { 1, 0, 0 };
 	movement(liigu, speed, serial);
-	sleepcp(500);
+	//sleepcp(500);
 }
 
 void charge(SerialClass& serial){
@@ -488,8 +489,8 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 
 	Mat black_thresh, black_result, white_thresh, white_result;
 
-	black_thresh = preprocess(frame, 0, 180, 0, 255, 0, 160);
-	white_thresh = preprocess(frame, 0, 180, 0, 255, 160, 255);
+	black_thresh = preprocess(frame, 25, 180, 0, 255, 0, 160);
+	white_thresh = preprocess(frame, 25, 180, 0, 255, 220, 255);
 
 	dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
 	bitwise_and(white_thresh, black_thresh, white_result);
@@ -498,7 +499,7 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 	Point2f mc_black, mc_white, corner1, corner2;
 
 	tie(mc_white, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
-
+	//cout << to_string(corner1.x);
 	return make_tuple(frame, corner1, corner2);
 
 }
@@ -524,9 +525,17 @@ tuple<Mat, Point2f, float> get_frame_ball(Mat frame, vector<int> ball){
 	findContours(ball_thresh, contours_ball, hierarchy_ball, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	Point2f mc_ball;
-	float kaugus;
-	tie(mc_ball, kaugus) = process_ball(contours_ball, frame);
-	return make_tuple(frame, mc_ball, kaugus);
+	float area;
+	tie(mc_ball, area) = process_ball(contours_ball, frame);
+	float palli_kaugus;
+	if (area > 0){
+		palli_kaugus = 2.5 * 1060 / (2 * area);
+	}
+	else{
+		palli_kaugus = -1;
+	}
+
+	return make_tuple(frame, mc_ball, palli_kaugus);
 }
 
 int main() {
@@ -610,6 +619,17 @@ int main() {
 		if (!cap.isOpened()) return -1;
 		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
+		SerialClass serial;//control motors etc
+
+		if (serial.connect("COM3", 19200))
+		{
+			std::cout << "Port COM3 is open." << std::endl;
+		}
+		else
+		{
+			std::cout << "Port open failed." << std::endl;
+		}
+
 
 		for (;;) {
 			Mat frame;
@@ -657,6 +677,9 @@ int main() {
 		}
 		cout << "waiting for start command..." << endl;
 		bool tribler = false;
+		int minunurk;
+		int pallinurk;
+		int nurk;
 		for (;;) {
 
 			cap >> frame;
@@ -679,7 +702,8 @@ int main() {
 			}
 
 			serial.send("bl\r\n");
-
+			Point2f c1, c2;
+			tie(frame, c1, c2) = get_frame_line(frame);
 			if (bl == true){
 				Point2f g;
 				if (goal_select == true){
@@ -694,119 +718,20 @@ int main() {
 					turn max 6 times(360deg), if no goal found move on
 					*/
 					turn16(false, serial);
-					turncounter_g++;
-					if (turncounter_g > 5){
-						turncounter_g = 0;
-						//move to new pos
-
-						cout << "turned" << endl;
-						turn16(true, serial);
-						turn16(true, serial);
-
-						cap >> frame;
-
-						Point2f tempg;
-						if (goal_select == true){
-							tie(frame, tempg) = get_frame_goal(frame, yellow_calib);
-						}
-						else{
-							tie(frame, tempg) = get_frame_goal(frame, blue_calib);
-						}
-
-						Point2f p1, p2;
-						tie(frame, p1, p2) = get_frame_line(frame);
-						//LISADA
-						int minunurk;
-						int ykaugus = 300;
-						if (p1.y != -1){
-							if (p1.y < p2.y){
-								Point2f temp;
-								temp.x = p2.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-							else if (p1.y> p2.y){
-								Point2f temp;
-								temp.x = p1.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-							else{
-								Point2f temp;
-								temp.x = p2.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-
-							int nurk = tous(p1, p2);
-
-							if ((nurk < 10) && (nurk>-10)){
-								// horisontaalne
-								if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon j‰‰b liikumisele ette
-									//‰ra liigu
-									turn16(false, serial);
-									turn16(false, serial);
-									turn16(false, serial);
-
-								}
-								else{
-									otse(globspeed, serial);
-
-								}
-							}
-							else if (nurk < 0){
-								if (minunurk < nurk){
-									//v‰ljs
-									/*
-									LISADA
-									strafe paremale
-									*/
-									turn16(true, serial);// joonest eemale
-									turn16(true, serial);
-
-								}
-								else{
-									otse(globspeed, serial);
-
-								}
-							}
-							else{
-								if (minunurk > nurk){
-									//v‰ljas
-									/*
-									LISADA
-									strafe vasakule
-									*/
-									turn16(false, serial);
-									turn16(false, serial);
-
-								}
-								else{
-									otse(globspeed, serial);
-
-								}
-							}
-						}
-						else{
-							otse(globspeed, serial);
-						}
-
-					}
-					/*
-					check if line in the way
-					move to better position
-					*/
 
 				}
 				else{
 					turncounter_g = 0;
-					float temporrar = 111;
-					if ((g.x<275) || (g.x >365)){
-						aim_ball(temporrar, g, serial);
-					}
-					else{
+					float temporrar = 999;
+					if ((g.x > 275) && (g.x < 365)){
+						stop_movement(serial);
 						charge(serial);
 						kick(serial);
+						stop_dribbler(serial);
+					}
+					else{
+						aim_ball(temporrar, g, serial);
+
 					}
 					//handle shooting
 					/*
@@ -819,267 +744,114 @@ int main() {
 				Point2f b;
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
+				cout << to_string(kaugus) << endl;
 				if (b.x == -1){
 
 					turn16(true, serial);
 
-					turncounter++;
-					if (turncounter > 5){
-						cout << "turned" << endl;
-						turncounter = 0;
-						turn16(false, serial);
-
-						cap >> frame;
-						tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
-
-						Point2f p1, p2;
-						tie(frame, p1, p2) = get_frame_line(frame);
-
-						int ykaugus = 300;
-						int minunurk;
-						if (p1.y != -1){
-							if (p1.y < p2.y){
-								Point2f temp;
-								temp.x = p2.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-							else if (p1.y> p2.y){
-								Point2f temp;
-								temp.x = p1.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-							else{
-								Point2f temp;
-								temp.x = p2.x;
-								temp.y = 300;
-								minunurk = tous(p2, temp);
-							}
-
-							int nurk = tous(p1, p2);
-
-							if ((nurk < 10) && (nurk>-10)){
-								// horisontaalne
-								if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon j‰‰b liikumisele ette
-									//‰ra liigu
-									turn16(false, serial);
-									turn16(false, serial);
-									turn16(false, serial);
-
-								}
-								else{
-									otse(50, serial);
-
-								}
-							}
-							else if (nurk < 0){
-								if (minunurk < nurk){
-									//v‰ljs
-									/*
-									LISADA
-									strafe paremale
-									*/
-									turn16(true, serial);// joonest eemale
-									turn16(true, serial);
-
-								}
-								else{
-									otse(globspeed, serial);
-
-								}
-							}
-							else{
-								if (minunurk > nurk){
-									//v‰ljas
-									/*
-									LISADA
-									strafe vasakule
-									*/
-									turn16(false, serial);
-									turn16(false, serial);
-
-								}
-								else{
-									otse(globspeed, serial);
-
-								}
-							}
-						}
-						else{
-							otse(globspeed, serial);
-						}
-					}
-
-
 
 				}
 				else{
+					if (kaugus < 60){
+						set_dribbler(serial);
+					}
+					else{
+						stop_dribbler(serial);
+					}
 					//handle catching
 					/*
 					turn to ball
 					if path clear, move to ball
 					else find better position
 					*/
-					turncounter = 0;
+					//set_dribbler(serial);
+
 					Point2f p1, p2;
 					tie(frame, p1, p2) = get_frame_line(frame);
-					if (p1.x != -1){//joon on n‰ha
-						int nurk = tous(p1, p2);
+					//cout << to_string(b.x) << endl;
+					if (p1.x == -1){
+						/*int nurk = tous(p1, p2);
 						if ((nurk > -10) && (nurk < 10)){
-							if ((b.y < p1.y) || (b.y < p2.y)){
-								cout << "v‰ljas" << endl;
-								turn16(false, serial);
-								turn16(false, serial);
-								turn16(false, serial);
+						if ((b.y < p1.y) || (b.y < p2.y)){
+						//kopi
+						turn16(false, serial);
+						turn16(false, serial);
+						turn16(false, serial);
+						}
+						else*/
+						if ((b.x > 275) && (b.x < 365)){
+							otse(globspeed, serial);
+						}
+						else{
+							aim_ball(kaugus, b, serial);
+						}
+					}
+					else{
 
-
+						int nurk = tous(p1, p2);
+						if (p1.y > p2.y){
+							int pallinurk = tous(b, p1);
+						}
+						else{
+							int pallinurk = tous(b, p2);
+						}
+						if (nurk < 0){
+							int pallinurk = tous(b, p1);
+							if (p1.y > p2.y){
+								int pallinurk = tous(b, p1);
 							}
 							else{
-								cout << "sees" << endl;
+								int pallinurk = tous(b, p2);
+							}
+							if (pallinurk < nurk){
+								//cout << "v2ljas";
+								turn16(true, serial);
+								turn16(true, serial);
+								turn16(true, serial);
+							}
+							else{
 								if ((b.x > 275) && (b.x < 365)){
-									//OTSE
-									//cout << "otse" << endl;
-									otse(globspeed, serial);
-
+									otse(75, serial);
 								}
 								else{
 									aim_ball(kaugus, b, serial);
 								}
 							}
 						}
-						if (p1.y>p2.y){
+						else{
 							int pallinurk = tous(b, p1);
-
-							if (nurk < 0){
-								if (pallinurk < nurk){
-									cout << "v‰ljas" << endl;
-									//lisada
-									/*
-									pˆˆra 2x, kontrolli ristumist joonega otse minnes
-
-									pane otse edasi, otsi j‰lle
-									*/
-									turn16(true, serial);//joonest eemale
-									turn16(true, serial);
-
-								}
-								else{
-									cout << "sees" << endl;
-
-									if ((b.x > 275) && (b.x < 365)){
-										//OTSE
-										//cout << "otse" << endl;
-										otse(globspeed, serial);
-
-									}
-									else{
-										aim_ball(kaugus, b, serial);
-									}
-								}
+							if (p1.y > p2.y){
+								int pallinurk = tous(b, p1);
 							}
 							else{
-								if (pallinurk > nurk){
-									cout << "v‰ljas" << endl;
-									//lisada
-									/*
-									pˆˆra 2x, kontrolli ristumist joonega otse minnes
-									pane otse edasi, otsi j‰lle
-									*/
-									turn16(false, serial);
-									turn16(false, serial);
-
-								}
-								else{
-									cout << "sees" << endl;
-
-									if ((b.x > 275) && (b.x < 365)){
-										//OTSE
-										//cout << "otse" << endl;
-										otse(globspeed, serial);
-
-									}
-									else{
-										aim_ball(kaugus, b, serial);
-									}
-								}
+								int pallinurk = tous(b, p2);
 							}
-						}
-						else{
-							int pallinurk = tous(b, p2);
-							if (nurk < 0){
-								if (pallinurk < nurk){
-									cout << "v‰ljas" << endl;
-									//lisada
-									/*
-									pˆˆra 2x, kontrolli ristumist joonega otse minnes
-									pane otse edasi, otsi j‰lle
-									*/
-									turn16(true, serial);
-									turn16(true, serial);
-
-								}
-								else{
-									cout << "sees" << endl;
-
-									if ((b.x > 275) && (b.x < 365)){
-										//OTSE
-										//cout << "otse" << endl;
-										otse(globspeed, serial);
-
-									}
-									else{
-										aim_ball(kaugus, b, serial);
-									}
-								}
+							if (pallinurk > nurk){
+								//cout << "v2ljas2 ";
+								turn16(true, serial);
+								turn16(true, serial);
+								turn16(true, serial);
 							}
 							else{
-								if (pallinurk > nurk){
-									cout << "v‰ljas" << endl;
-									//lisada
-									/*
-									pˆˆra 2x, kontrolli ristumist joonega otse minnes
-									pane otse edasi, otsi j‰lle
-									*/
-									turn16(false, serial);
-									turn16(false, serial);
-
+								if ((b.x > 275) && (b.x < 365)){
+									otse(75, serial);
 								}
 								else{
-									cout << "sees" << endl;
-
-									if ((b.x > 275) && (b.x < 365)){
-										//OTSE
-										//cout << "otse" << endl;
-										otse(globspeed, serial);
-
-									}
-									else{
-										aim_ball(kaugus, b, serial);
-									}
+									aim_ball(kaugus, b, serial);
 								}
 							}
 						}
-
 					}
-					else{//joont pole n‰ha
-						if ((b.x > 275) && (b.x < 365)){
-							//OTSE
-							//cout << "otse" << endl;
-							otse(globspeed, serial);
 
 
-						}
-						else{
-							aim_ball(kaugus, b, serial);
-						}
-					}
 				}
+
+
+
+
+				imshow("orig", frame);
+				waitKey(10);
 			}
-
-			imshow("orig", frame);
-			waitKey(10);
-
 		}
 	}
 
