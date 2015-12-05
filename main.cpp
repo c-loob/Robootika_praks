@@ -756,7 +756,7 @@ int main() {
 						tie(frame, p1, p2) = get_frame_line(frame);
 						if (p1.x != -1){//joon on näha
 							int nurk = tous(p1, p2);
-							cout << nurk << endl;
+							//cout << nurk << endl;
 
 						}
 						else{//joont pole näha
