@@ -31,7 +31,7 @@ bool stopbool = true;
 bool bl = false;
 String my_robotID = "A";
 String my_field = "A";
-bool goal_select = true; //true = yellow, false = blue
+bool goal_select = false; //true = yellow, false = blue
 bool respond = false;
 
 int turncounter = 0;
@@ -419,23 +419,29 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 	if (kaugus == 999){
 		if (mc.x < 320){
 
-			turn(30, 0, serial);
+			turn(40, 0, serial);
 		}
 		else if (mc.x > 320){
 
-			turn(30, 1, serial);
+			turn(40, 1, serial);
 		}
 	}
-	else if (kaugus > 100){//kaugel
-		if (mc.x < 275){
+	else if ((kaugus > 120) && (kaugus<201)){//kaugel
+		if (mc.x < 240){
 
-			turn(50, 0, serial);
+			turn(30, 0, serial);
 		}
-		else if (mc.x > 365){
+		else if (mc.x > 410){
 
-			turn(50, 1, serial);
+			turn(30, 1, serial);
+		}
+		else{
+			otse(125, serial);
 		}
 
+	}
+	else if (kaugus > 200){
+		otse(150, serial);
 	}
 	else{//lähedal
 		if (mc.x < 275){
@@ -445,6 +451,9 @@ void aim_ball(float kaugus, Point2f mc, SerialClass& serial){
 		else if (mc.x > 365){
 			direction = 0;
 			turn(30, 1, serial);
+		}
+		else{
+			otse(100, serial);
 		}
 
 	}
@@ -756,7 +765,7 @@ int main() {
 						set_dribbler(serial);
 					}
 					else{
-						stop_dribbler(serial);
+						//stop_dribbler(serial);
 					}
 					//handle catching
 					/*
@@ -810,8 +819,9 @@ int main() {
 								turn16(true, serial);
 							}
 							else{
-								if ((b.x > 275) && (b.x < 365)){
-									otse(75, serial);
+								if ((b.x > 235) && (b.x < 365)){
+									otse(125, serial);
+									sleepcp(100);
 								}
 								else{
 									aim_ball(kaugus, b, serial);
@@ -833,8 +843,8 @@ int main() {
 								turn16(true, serial);
 							}
 							else{
-								if ((b.x > 275) && (b.x < 365)){
-									otse(75, serial);
+								if ((b.x > 235) && (b.x < 385)){
+									otse(125, serial);
 								}
 								else{
 									aim_ball(kaugus, b, serial);
