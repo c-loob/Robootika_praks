@@ -365,7 +365,7 @@ void turn16(bool direction, SerialClass& serial){//direction
 		liigu[2] = -turnamount;
 	}
 	movement(liigu, speed, serial);
-	//sleepcp(2000);
+	
 }
 
 void turn(int speed, int direction, SerialClass& serial){
@@ -754,19 +754,33 @@ int main() {
 						cap >> frame;
 						Point2f p1, p2;
 						tie(frame, p1, p2) = get_frame_line(frame);
-						if (p1.x != -1){//joon on näha
-							int nurk = tous(p1, p2);
-							//cout << nurk << endl;
 
+						Point2f tempb;
+						tie(frame, tempb, kaugus) = get_frame_ball(frame, ball_calib);
+						if (tempb.x != -1){
+							break;
 						}
-						else{//joont pole näha
-							turn16(true, serial);
-						}
+
+						turn16(true, serial);
+						sleepcp(1000);
+						
 						imshow("orig", frame);
 						waitKey(10);
 					}
-					cout << "turned" << endl;
-					//sleepcp(500);
+					tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
+					if (b.x == -1){
+						//change position
+						//lisada
+						/*
+						joon näha?
+						kas otse minnes ristume joonega? sarnane palliga, palli pt asemel nt keskel (320, 240)
+						kui jah, siis pööra veel korra ja proovi uuesti.
+						*/
+						cout << "turned" << endl;
+						turn16(false, serial);
+					}
+					
+					
 
 				}
 				else{
@@ -784,6 +798,11 @@ int main() {
 						if ((nurk > -10) && (nurk < 10)){
 							if ((b.y < p1.y) || (b.y < p2.y)){
 								cout << "väljas" << endl;
+								//lisada
+								/*
+								pööra 2x, kontrolli ristumist joonega otse minnes
+								pane otse edasi, otsi jälle
+								*/
 							}
 							else{
 								cout << "sees" << endl;
@@ -804,8 +823,11 @@ int main() {
 							if (nurk < 0){
 								if (pallinurk < nurk){
 									cout << "väljas" << endl;
-									//cout << "sees" << endl;
-									//sleepcp(2000);
+									//lisada
+									/*
+									pööra 2x, kontrolli ristumist joonega otse minnes
+									pane otse edasi, otsi jälle
+									*/
 								}
 								else{
 									cout << "sees" << endl;
@@ -824,7 +846,11 @@ int main() {
 							else{
 								if (pallinurk > nurk){
 									cout << "väljas" << endl;
-									//sleepcp(2000);
+									//lisada
+									/*
+									pööra 2x, kontrolli ristumist joonega otse minnes
+									pane otse edasi, otsi jälle
+									*/
 								}
 								else{
 									cout << "sees" << endl;
@@ -846,7 +872,11 @@ int main() {
 							if (nurk < 0){
 								if (pallinurk < nurk){
 									cout << "väljas" << endl;
-									//sleepcp(2000);
+									//lisada
+									/*
+									pööra 2x, kontrolli ristumist joonega otse minnes
+									pane otse edasi, otsi jälle
+									*/
 								}
 								else{
 									cout << "sees" << endl;
@@ -865,7 +895,11 @@ int main() {
 							else{
 								if (pallinurk > nurk){
 									cout << "väljas" << endl;
-									//sleepcp(2000);
+									//lisada
+									/*
+									pööra 2x, kontrolli ristumist joonega otse minnes
+									pane otse edasi, otsi jälle
+									*/
 								}
 								else{
 									cout << "sees" << endl;
