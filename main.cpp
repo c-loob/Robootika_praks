@@ -35,6 +35,7 @@ bool goal_select = true; //true = yellow, false = blue
 bool respond = false;
 
 int turncounter = 0;
+int turncounter_g = 0;
 
 
 class SimpleSerial
@@ -691,13 +692,104 @@ int main() {
 					/*
 					turn max 6 times(360deg), if no goal found move on
 					*/
-					int countTurn = 0;
-					while (countTurn < 6){
+					turn16(false, serial);
+					turncounter_g++;
+					if(turncounter_g > 5){
+						turncounter_g = 0;
+						//move to new pos
 
-						//float *liigu = turn16();
-						//get frame
-						//check if goal now in view, if yes, break
-						//if no ball in dribbler, break
+						cout << "turned" << endl;
+						turn16(true, serial);
+						turn16(true, serial);
+
+						cap >> frame;
+
+						Point2f tempg;
+						if (goal_select == true){
+						tie(frame, tempg) = get_frame_goal(frame, yellow_calib);
+						}
+						else{
+						tie(frame, tempg) = get_frame_goal(frame, blue_calib);
+						}
+
+						Point2f p1, p2;
+						tie(frame, p1, p2) = get_frame_line(frame);
+						//LISADA
+						int minunurk;
+						int ykaugus = 300;
+						if (p1.y != -1){
+							if (p1.y < p2.y){
+								Point2f temp;
+								temp.x = p2.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+							else if (p1.y> p2.y){
+								Point2f temp;
+								temp.x = p1.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+							else{
+								Point2f temp;
+								temp.x = p2.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+
+							int nurk = tous(p1, p2);
+
+							if ((nurk < 10) && (nurk>-10)){
+								// horisontaalne
+								if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon j‰‰b liikumisele ette
+									//‰ra liigu
+									turn16(false, serial);
+									turn16(false, serial);
+									turn16(false, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
+							else if (nurk < 0){
+								if (minunurk < nurk){
+									//v‰ljs
+									/*
+									LISADA
+									strafe paremale
+									*/
+									turn16(true, serial);// joonest eemale
+									turn16(true, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
+							else{
+								if (minunurk > nurk){
+									//v‰ljas
+									/*
+									LISADA
+									strafe vasakule
+									*/
+									turn16(false, serial);
+									turn16(false, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
+						}
+						else{
+							otse(75, serial);
+						}
+
 					}
 					/*
 					check if line in the way
@@ -706,6 +798,7 @@ int main() {
 
 				}
 				else{
+					turncounter_g = 0;
 					//handle shooting
 					/*
 					if shot clear shoot,
@@ -732,75 +825,80 @@ int main() {
 
 						Point2f p1, p2;
 						tie(frame, p1, p2) = get_frame_line(frame);
-						
+
 						int ykaugus = 300;
 						int minunurk;
-						if (p1.y < p2.y){
-							Point2f temp;
-							temp.x = p2.x;
-							temp.y = 300;
-							minunurk = tous(p2, temp);
-						}
-						else if (p1.y> p2.y){
-							Point2f temp;
-							temp.x = p1.x;
-							temp.y = 300;
-							minunurk = tous(p2, temp);
+						if (p1.y != -1){
+							if (p1.y < p2.y){
+								Point2f temp;
+								temp.x = p2.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+							else if (p1.y> p2.y){
+								Point2f temp;
+								temp.x = p1.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+							else{
+								Point2f temp;
+								temp.x = p2.x;
+								temp.y = 300;
+								minunurk = tous(p2, temp);
+							}
+
+							int nurk = tous(p1, p2);
+
+							if ((nurk < 10) && (nurk>-10)){
+								// horisontaalne
+								if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon j‰‰b liikumisele ette
+									//‰ra liigu
+									turn16(false, serial);
+									turn16(false, serial);
+									turn16(false, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
+							else if (nurk < 0){
+								if (minunurk < nurk){
+									//v‰ljs
+									/*
+									LISADA
+									strafe paremale
+									*/
+									turn16(true, serial);// joonest eemale
+									turn16(true, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
+							else{
+								if (minunurk > nurk){
+									//v‰ljas
+									/*
+									LISADA
+									strafe vasakule
+									*/
+									turn16(false, serial);
+									turn16(false, serial);
+
+								}
+								else{
+									otse(75, serial);
+
+								}
+							}
 						}
 						else{
-							Point2f temp;
-							temp.x = p2.x;
-							temp.y = 300;
-							minunurk = tous(p2, temp);
-						}
-
-						int nurk = tous(p1, p2);
-
-						if ((nurk < 10) && (nurk>-10)){
-							// horisontaalne
-							if ((p1.y > ykaugus) || (p2.y > ykaugus)){//joon j‰‰b liikumisele ette
-								//‰ra liigu
-								turn16(false, serial);
-								turn16(false, serial);
-								turn16(false, serial);
-
-							}
-							else{
-								otse(75, serial);
-								
-							}
-						}
-						else if (nurk < 0){
-							if (minunurk < nurk){
-								//v‰ljs
-								/*
-								LISADA
-								strafe paremale
-								*/
-								turn16(true, serial);// joonest eemale
-								turn16(true, serial);
-
-							}
-							else{
-								otse(75, serial);
-								
-							}
-						}
-						else{
-							if (minunurk > nurk){
-								//v‰ljas
-								/*
-								LISADA
-								strafe vasakule
-								*/
-								turn16(false, serial);
-								turn16(false, serial);
-
-							}
-							else{
-								otse(75, serial);
-
-							}
+							otse(75, serial);
 						}
 					}
 
