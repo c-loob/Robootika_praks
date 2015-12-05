@@ -294,6 +294,7 @@ void turn16(bool direction, SerialClass& serial);
 void turn(int speed, float mc, SerialClass& serial);
 void otse(int speed, SerialClass& serial);
 void stop_movement(SerialClass& serial);
+tuple<Mat, Point2f, Point2f> get_frame_opp(Mat frame, vector<int> yellow, vector<int> blue);
 
 void movement(float liigu[3], int max_speed, SerialClass& serial){
 	float *jouvektor;
@@ -532,6 +533,25 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 
 }
 
+tuple<Mat, Point2f, Point2f> get_frame_opp(Mat frame, vector<int> yellow, vector<int> blue){
+
+	Mat blue_thresh, blue_result, yellow_thresh, yellow_result;
+
+	blue_thresh = preprocess(frame, blue[0], blue[1], blue[2], blue[3], blue[4], blue[5]);
+	yellow_thresh = preprocess(frame, yellow[0], yellow[1], yellow[2], yellow[3], yellow[4], yellow[5]);
+
+	dilate(yellow_thresh, yellow_thresh, Mat(), Point(-1, -1), 20);
+	bitwise_and(yellow_thresh, blue_thresh, yellow_result);
+
+	findContours(yellow_result, contours_white, hierarchy_white, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	Point2f mc_blue, mc_yellow, corner1, corner2;
+
+	tie(mc_yellow, corner1, corner2) = process_goal(contours_white, frame, Scalar(255, 0, 0));
+	//cout << to_string(corner1.x);
+	return make_tuple(frame, corner1, corner2);
+
+}
+
 //check if goal in view
 tuple<Mat, Point2f> get_frame_goal(Mat frame, vector<int> goal){
 	Mat goal_thresh;
@@ -691,6 +711,12 @@ int main() {
 
 			
 			while (stopbool ==true){
+				cap >> frame;
+				Point2f p1, p2;
+				tie(frame, p1, p2) = get_frame_opp(frame, yellow_calib, blue_calib);
+				line(frame, p1, p2, Scalar(255, 0, 0), 10, 8, 0);
+				imshow("opp", frame);
+				waitKey(19);
 				cout << ".";
 			}
 			
