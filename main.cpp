@@ -110,23 +110,24 @@ public:
 				std::string data(size, '\0');
 				is.read(&data[0], size);
 				std::cout << data << endl;
-				if ((data[1] == my_field[0])||(data[1]=='X')){//field ID matches
-					if ((data[2] == my_robotID[0]) || (data[2] == 'X')){//robot ID matches
-						if (data.find("START") != std::string::npos){
-							startbool = true;
-							stopbool = false;
-						}
-						if (data.find("STOP") != std::string::npos){
-							stopbool = true;
-							startbool = false;
+				if (data.length() >8){
+					if ((data[1] == my_field[0]) || (data[1] == 'X')){//field ID matches
+						if ((data[2] == my_robotID[0]) || (data[2] == 'X')){//robot ID matches
+							if (data.find("START") != std::string::npos){
+								startbool = true;
+								stopbool = false;
+							}
+							if (data.find("STOP") != std::string::npos){
+								stopbool = true;
+								startbool = false;
+							}
 						}
 					}
 				}
-				
-					//}
-					//}
-					//}
-				
+				//}
+				//}
+				//}
+
 				//std::cout << data << endl;
 				//If we receive quit()\r\n indicate
 				//end of operations
@@ -241,7 +242,7 @@ public:
 						bl = true;
 					}
 				}
-				
+
 				//std::cout << data << endl;
 				//If we receive quit()\r\n indicate
 				//end of operations
@@ -594,8 +595,8 @@ int main() {
 	int speed = 150;
 
 	ifstream calib_param;
-	//calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
-	calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
+	calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
+	//calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
 
 	std::vector<int> ball_calib;
@@ -638,7 +639,7 @@ int main() {
 	{
 		std::cout << "Port open failed." << std::endl;
 	}
-	
+
 	if (state == 0){
 		//trackbar creation
 		/*
@@ -671,7 +672,7 @@ int main() {
 		if (!cap.isOpened()) return -1;
 		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-		
+
 
 		for (;;) {
 			Mat frame;
@@ -709,17 +710,21 @@ int main() {
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-			
-			while (stopbool ==true){
+
+			while (stopbool == true){
 				cap >> frame;
 				Point2f p1, p2;
 				tie(frame, p1, p2) = get_frame_opp(frame, yellow_calib, blue_calib);
 				line(frame, p1, p2, Scalar(255, 0, 0), 10, 8, 0);
+
+				if ((p1.x < 320) && (p2.x>320) || (p2.x < 320) && (p1.x>320)){
+					cout << "EES|";
+				}
+
 				imshow("opp", frame);
 				waitKey(19);
-				cout << ".";
 			}
-			
+
 			if (respond == true){
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
 				respond = false;
