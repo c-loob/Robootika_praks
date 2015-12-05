@@ -514,7 +514,7 @@ tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 	Mat black_thresh, black_result, white_thresh, white_result;
 	
 	black_thresh = preprocess(frame, 0, 180, 0, 255, 0, 160);
-	white_thresh = preprocess(frame, 0, 180, 0, 255, 240, 255);
+	white_thresh = preprocess(frame, 0, 180, 0, 255, 160, 255);
 
 	dilate(white_thresh, white_thresh, Mat(), Point(-1, -1), 10);
 	bitwise_and(white_thresh, black_thresh, white_result);
@@ -787,9 +787,12 @@ int main() {
 							if (nurk < 0){
 								if (pallinurk < nurk){
 									cout << "väljas" << endl;
+									cout << "sees" << endl;
 									//sleepcp(2000);
 								}
 								else{
+									cout << "sees" << endl;
+
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
@@ -807,6 +810,8 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
+									cout << "sees" << endl;
+
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
@@ -827,6 +832,8 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
+									cout << "sees" << endl;
+
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
@@ -844,6 +851,8 @@ int main() {
 									//sleepcp(2000);
 								}
 								else{
+									cout << "sees" << endl;
+
 									if ((b.x > 275) && (b.x < 365)){
 										//OTSE
 										//cout << "otse" << endl;
