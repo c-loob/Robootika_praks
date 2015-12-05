@@ -26,11 +26,11 @@ vector< Vec4i > hierarchy_ball, hierarchy_goal, hierarchy_black, hierarchy_white
 bool dribbler = false;
 bool suund;
 mutex mu;
-bool refstart = false;
+bool startbool = false;
 bool stopbool = true;
 bool bl = false;
-String my_robotID = "A";
-String my_field = "A";
+String my_robotID = "B";
+String my_field = "B";
 bool goal_select = false; //true = yellow, false = blue
 bool respond = false;
 
@@ -38,62 +38,119 @@ int turncounter = 0;
 int turncounter_g = 0;
 int globspeed = 70;
 
-class SimpleSerial
-{
+class SerialClass2{
 public:
-	/**
-	* Constructor.
-	* \param port device name, example "/dev/ttyUSB0" or "COM4"
-	* \param baud_rate communication speed, example 9600 or 115200
-	* \throws boost::system::system_error if cannot open the
-	* serial device
-	*/
-	SimpleSerial(std::string port, unsigned int baud_rate)
-		: io(), serial(io, port)
+	SerialClass2() :
+		port(io),
+		quitFlag(false){};
+
+	~SerialClass2()
 	{
-		serial.set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
+		//Stop the I/O services
+		io.stop();
+
+		//Wait for the thread to finish
+		runner.join();
+
+
 	}
 
-	/**
-	* Write a string to the serial device.
-	* \param s string to write
-	* \throws boost::system::system_error on failure
-	*/
-	void writeString(std::string s)
+	bool connect(const std::string& port_name, int baud = 19200)
 	{
-		boost::asio::write(serial, boost::asio::buffer(s.c_str(), s.size()));
-	}
+		using namespace boost::asio;
+		port.open(port_name);
+		//Setup port
+		port.set_option(serial_port::baud_rate(baud));
+		port.set_option(serial_port::flow_control(
+			serial_port::flow_control::none));
 
-	/**
-	* Blocks until a line is received from the serial device.
-	* Eventual '\n' or '\r\n' characters at the end of the string are removed.
-	* \return a string containing the received line
-	* \throws boost::system::system_error on failure
-	*/
-	std::string readLine()
-	{
-		//Reading data char by char, code is optimized for simplicity, not speed
-		using namespace boost;
-		char c;
-		std::string result;
-		for (;;)
+		if ((port.is_open()) && (port_name.compare("COM3")))//if is open AND is NOT COM3
 		{
-			asio::read(serial, asio::buffer(&c, 1));
-			switch (c)
-			{
-			case '\r':
-				break;
-			case '\n':
-				return result;
-			default:
-				result += c;
-			}
+			//Start io-service in a background thread.
+			//boost::bind binds the ioservice instance
+			//with the method call
+			runner = boost::thread(
+				boost::bind(
+				&boost::asio::io_service::run,
+				&io));
+
+			startReceive();
 		}
+		return port.is_open();
 	}
+
+	void startReceive()
+	{
+		using namespace boost::asio;
+		//Issue a async receive and give it a callback
+		//onData that should be called when "\r\n"
+		//is matched.
+		async_read_until(port, buffer,
+			"-",
+			boost::bind(&SerialClass2::onData,
+			this, _1, _2));
+
+	}
+
+	void send(const std::string& text)
+	{
+		boost::asio::write(port, boost::asio::buffer(text));
+	}
+
+
+	void onData(const boost::system::error_code& e,
+		std::size_t size)
+	{
+		try{
+			if (!e)
+			{
+
+				std::istream is(&buffer);
+				//std::istream is2(&buffer);
+				std::string data(size, '\0');
+				is.read(&data[0], size);
+				std::cout << data << endl;
+				if ((data[1] == my_field[0])||(data[1]=='X')){//field ID matches
+					if ((data[2] == my_robotID[0]) || (data[2] == 'X')){//robot ID matches
+						if (data.find("START") != std::string::npos){
+							startbool = true;
+							stopbool = false;
+						}
+						if (data.find("STOP") != std::string::npos){
+							stopbool = true;
+							startbool = false;
+						}
+					}
+				}
+				
+					//}
+					//}
+					//}
+				
+				//std::cout << data << endl;
+				//If we receive quit()\r\n indicate
+				//end of operations
+				quitFlag = (data.compare("quit()\r\n") == 0);
+			};
+		}
+		catch (Exception &e){
+
+		}
+		startReceive();
+	};
+
+	bool quit(){ return quitFlag; }
 
 private:
 	boost::asio::io_service io;
-	boost::asio::serial_port serial;
+	//boost::asio::io_service io2;
+	boost::asio::serial_port port;
+
+	boost::thread runner;
+	boost::thread runner2;
+	boost::asio::streambuf buffer;
+	//boost::asio::streambuf buffer2;
+	bool quitFlag;
 };
 
 class SerialClass{
@@ -184,45 +241,7 @@ public:
 						bl = true;
 					}
 				}
-				else{
-					//	std::cout << data << endl;
-					//cout <<"0 " <<  data[0] << " " << data[1] << " " << data[2] << endl;
-					//if ((data[0] == 'a')){//kohtinuku käsuks piisavalt pikk ja algab 'a'-ga
-					/*if ((data[1] == 'A') || (data[1] == 'X')){//command is for my field
-					if ((data[2] == 'X') || (data[2] == 'A')){//command is for everybody
-					if (data[2] == my_robotID[0]){
-					respond = true;
-					}*/
-					if ((data.find("AX") != std::string::npos) || (data.find("AA") != std::string::npos) || (data.find("XX") != std::string::npos)){
-						if (data.find("STOP") != std::string::npos){//command is STOP
-							std::cout << "stopping..1." << endl;
-							refstart = false;
-							stopbool = true;
-						}
-						else{//command is START
-
-							refstart = true;
-							std::cout << "starting.1..." << endl;
-							stopbool = false;
-						}
-					}
-					if (data.find("STOP") != std::string::npos){//command is STOP
-						std::cout << "stopping..." << endl;
-						refstart = false;
-						stopbool = true;
-						std::cout << "stop" << endl;
-					}
-					else if (data.find("STAR") != std::string::npos){//command is START
-
-						refstart = true;
-						std::cout << "starting...." << endl;
-						stopbool = false;
-						std::cout << "start" << endl;
-					}
-					//}
-					//}
-					//}
-				}
+				
 				//std::cout << data << endl;
 				//If we receive quit()\r\n indicate
 				//end of operations
@@ -555,7 +574,8 @@ int main() {
 	int speed = 150;
 
 	ifstream calib_param;
-	calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
+	//calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
+	calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
 
 	std::vector<int> ball_calib;
@@ -577,28 +597,31 @@ int main() {
 			}
 		}
 	}
-	/*
-	ball_calib[0] = 5;
-	ball_calib[1] = 25;
-	ball_calib[2] = 80;
-	ball_calib[3] = 255;
-	ball_calib[4] = 50;
-	ball_calib[5] = 255;
-	yellow_calib[0] = 15;
-	yellow_calib[1] = 40;
-	yellow_calib[2] = 100;
-	yellow_calib[3] = 255;
-	yellow_calib[4] = 70;
-	yellow_calib[5] = 255;
-	blue_calib[0] = 90;
-	blue_calib[1] = 108;
-	blue_calib[2] = 160;
-	blue_calib[3] = 255;
-	blue_calib[4] = 70;
-	blue_calib[5] = 221;
-	*/
+
+	SerialClass serial;//control motors etc
+	SerialClass2 serialref;
+
+	if (serial.connect("COM3", 19200))
+	{
+		std::cout << "Port COM3 is open." << std::endl;
+	}
+	else
+	{
+		std::cout << "Port open failed." << std::endl;
+	}
+
+	if (serialref.connect("COM4", 19200))
+	{
+		std::cout << "Port COM4 is open." << std::endl;
+	}
+	else
+	{
+		std::cout << "Port open failed." << std::endl;
+	}
+	
 	if (state == 0){
 		//trackbar creation
+		/*
 		namedWindow("yellow", WINDOW_AUTOSIZE);//trackbaride aken
 		namedWindow("blue", WINDOW_AUTOSIZE);//trackbaride aken
 		namedWindow("ball", WINDOW_AUTOSIZE);//trackbaride aken
@@ -623,22 +646,12 @@ int main() {
 		createTrackbar("HighS", "ball", &ball_calib[3], 255);
 		createTrackbar("LowV", "ball", &ball_calib[4], 255);//value
 		createTrackbar("HighV", "ball", &ball_calib[5], 255);
-
+		*/
 		VideoCapture cap(0);
 		if (!cap.isOpened()) return -1;
 		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
-		SerialClass serial;//control motors etc
-
-		if (serial.connect("COM3", 19200))
-		{
-			std::cout << "Port COM3 is open." << std::endl;
-		}
-		else
-		{
-			std::cout << "Port open failed." << std::endl;
-		}
-
+		
 
 		for (;;) {
 			Mat frame;
@@ -647,29 +660,11 @@ int main() {
 			Point2f corner1;
 			float kaugus;
 
-			tie(frame, corner1, kaugus) = get_frame_ball(frame, ball_calib);
-			//cout << kaugus << endl;
-			//tie(frame, mc_ball, mc_goal, kaugus) = get_frame(cap, ball_calib, yellow_calib, blue_calib, state);
 			imshow("calibrate", frame);
 			waitKey(10);
 		}
 	}
 	else if (state == 1){
-		//connect to serial ports
-		SerialClass serial;//control motors etc
-
-		if (serial.connect("COM3", 19200))
-		{
-			std::cout << "Port COM3 is open." << std::endl;
-		}
-		else
-		{
-			std::cout << "Port open failed." << std::endl;
-		}
-
-		SimpleSerial serialr("COM4", 19200);
-
-
 		VideoCapture cap(0);
 		if (!cap.isOpened()) return -1;
 		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
@@ -694,17 +689,11 @@ int main() {
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-			/*
+			
 			while (stopbool ==true){
-			Mat frame;
-			Point2f corner1, corner2;
-			float kaugus;
-			tie(frame, corner1, kaugus) = get_frame_ball(cap, ball_calib);
-			cout << kaugus << endl;
-			imshow("test", frame);
-			waitKey(10);
+				cout << ".";
 			}
-			*/
+			
 			if (respond == true){
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
 				respond = false;
