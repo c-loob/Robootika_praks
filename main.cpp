@@ -352,16 +352,20 @@ void stop_movement(SerialClass& serial){
 }
 
 void turn16(bool direction, SerialClass& serial){//direction 
-	float turnamount = 0.5;//pos == vasakule
-	int speed = 50;
+	float turnamount =0.8;//pos == vasakule
+	float strafe = 0.3;
+	int speed = 40;
 	float liigu[3] = { 0, 0, 0 };
 	if (direction == true){
-		float liigu[3] = { 0, 0, turnamount };
+		liigu[1] = strafe;
+		liigu[2] = turnamount ;
 	}
 	else{
-		float liigu[3] = { 0, 0, -turnamount };
+		liigu[1] = -strafe;
+		liigu[2] =-turnamount ;
 	}
 	movement(liigu, speed, serial);
+	//sleepcp(2000);
 }
 
 void turn(int speed, int direction, SerialClass& serial){
@@ -558,7 +562,7 @@ int main() {
 	int speed = 150;
 
 	ifstream calib_param;
-	calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
+	calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
 	
 	std::vector<int> ball_calib;
@@ -580,6 +584,7 @@ int main() {
 			}
 		}
 	}
+	/*
 	ball_calib[0] = 5;
 	ball_calib[1] = 25;
 	ball_calib[2] = 80;
@@ -598,6 +603,7 @@ int main() {
 	blue_calib[3] = 255;
 	blue_calib[4] = 70;
 	blue_calib[5] = 221;
+	*/
 	if (state == 0){
 		//trackbar creation
 		namedWindow("yellow", WINDOW_AUTOSIZE);//trackbaride aken
