@@ -29,8 +29,10 @@ mutex mu;
 bool startbool = false;
 bool stopbool = true;
 bool bl = false;
-String my_robotID = "B";
-String my_field = "B";
+//panepane - roboti ID ja field tuleb määrata siin
+String my_robotID = "U";
+String my_field = "V";
+//panepane - määra värav kuhu rünnata
 bool goal_select = false; //true = yellow, false = blue
 bool respond = false;
 
@@ -101,6 +103,7 @@ public:
 	void onData(const boost::system::error_code& e,
 		std::size_t size)
 	{
+		//cout << "wat" << endl;
 		try{
 			if (!e)
 			{
@@ -109,8 +112,9 @@ public:
 				//std::istream is2(&buffer);
 				std::string data(size, '\0');
 				is.read(&data[0], size);
+			//	cout << "test - ";
 				std::cout << data << endl;
-				if (data.length() >8){
+				if (data.length() >6){
 					if ((data[1] == my_field[0]) || (data[1] == 'X')){//field ID matches
 						if ((data[2] == my_robotID[0]) || (data[2] == 'X')){//robot ID matches
 							if (data.find("START") != std::string::npos){
@@ -515,6 +519,12 @@ void kick(SerialClass& serial){
 	serial.send("k\r\n");
 }
 
+
+void turn_ball(SerialClass& serial){
+	float liigu[3] = { 0, 0.5, 1 };
+	movement(liigu, 30, serial);
+}
+
 tuple<Mat, Point2f, Point2f> get_frame_line(Mat frame){
 
 	Mat black_thresh, black_result, white_thresh, white_result;
@@ -588,6 +598,7 @@ tuple<Mat, Point2f, float> get_frame_ball(Mat frame, vector<int> ball){
 }
 
 int main() {
+	//panepane - võistluse state = 1, 0 = testimine pmst
 	int state = 1;//select state 0-calib color, no serial; 1- competition mode, no trackbars
 	Mat frame;
 	Point2f mc_ball, mc_goal;
@@ -595,6 +606,7 @@ int main() {
 	int speed = 150;
 
 	ifstream calib_param;
+	//panepane - ülemine robotile, kommenteeri alumine välja!
 	calib_param.open("C:\\Users\\Sarvik\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	//calib_param.open("C:\\Users\\Dell\\Documents\\GitHub\\Robootika_praks\\calib_param.txt");
 	char output[10];
@@ -620,7 +632,7 @@ int main() {
 	}
 
 	SerialClass serial;//control motors etc
-	SerialClass2 serialref;
+	SerialClass2 serialref;//referee
 
 	if (serial.connect("COM3", 19200))
 	{
@@ -675,6 +687,7 @@ int main() {
 
 
 		for (;;) {
+			//test area
 			Mat frame;
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
@@ -691,9 +704,9 @@ int main() {
 		cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
 		cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
-
-		cout << "My robot ID: " << my_robotID[0] << endl;
 		cout << "My field ID: " << my_field[0] << endl;
+		cout << "My robot ID: " << my_robotID[0] << endl;
+
 		if (goal_select == true){
 			cout << "My goal: " << "yellow" << endl;
 		}
@@ -710,10 +723,12 @@ int main() {
 			cap >> frame;
 			if (!cap.read(frame)) std::cout << "error reading frame" << endl;//check for error'
 
-
+			cout << to_string(stopbool) << endl;
 			while (stopbool == true){
+				//test area
 				cap >> frame;
 				Point2f p1, p2;
+				//----------------------------------------------------------------------lisada------------------------------------
 				tie(frame, p1, p2) = get_frame_opp(frame, yellow_calib, blue_calib);
 				line(frame, p1, p2, Scalar(255, 0, 0), 10, 8, 0);
 
@@ -725,7 +740,7 @@ int main() {
 				waitKey(19);
 			}
 
-			if (respond == true){
+			if (respond == true){//------------------------------------------------------lisada!-----------------------------------
 				String temp = "a" + my_field + my_robotID + "ACK-----\r";
 				respond = false;
 			}
@@ -773,7 +788,7 @@ int main() {
 				Point2f b;
 				float kaugus;
 				tie(frame, b, kaugus) = get_frame_ball(frame, ball_calib);
-				cout << to_string(kaugus) << endl;
+				//cout << to_string(kaugus) << endl;
 				if (b.x == -1){
 
 					turn16(true, serial);
@@ -853,6 +868,7 @@ int main() {
 							if (p1.y > p2.y){
 								int pallinurk = tous(b, p1);
 							}
+
 							else{
 								int pallinurk = tous(b, p2);
 							}
